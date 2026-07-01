@@ -10,8 +10,9 @@
     "skyagent": "./scripts/skyagent.ts"
   },
   "scripts": {
-    "check": "bun run typecheck && bun run smoke",
+    "check": "bun run typecheck && bun run test && bun run smoke",
     "ci": "bun run check && bun run validate:plugin && bun run validate:skill",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple",
     "validate:plugin": "bun ./scripts/ci/validate-plugin.ts",
@@ -24,6 +25,7 @@
     "@skyagent/mcp": "workspace:*"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.14",
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3"
   }

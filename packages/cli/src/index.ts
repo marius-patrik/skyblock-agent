@@ -2,6 +2,7 @@
 
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
+import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
 function print(value, pretty = true) {
@@ -26,6 +27,9 @@ Usage:
   skyagent profile [profileId]
   skyagent member [nameOrUuid] [profileIdOrName]
   skyagent overview [nameOrUuid] [profileIdOrName]
+  skyagent inventory [nameOrUuid] [profileIdOrName] [--debug-raw]
+  skyagent inventory-section <section> [nameOrUuid] [profileIdOrName] [--debug-raw]
+  skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section> [--debug-raw]
   skyagent skycrypt [nameOrUuid] [profileName]
   skyagent museum [profileId]
   skyagent garden [profileId]
@@ -57,6 +61,46 @@ function kvPairs(args) {
     query[arg.slice(0, index)] = arg.slice(index + 1);
   }
   return query;
+}
+
+function withoutFlags(args) {
+  return args.filter((arg) => !arg.startsWith("--"));
+}
+
+function optionValue(args, option) {
+  const index = args.indexOf(option);
+  return index === -1 ? null : args[index + 1] ?? null;
+}
+
+function positionalArgs(args, optionsWithValues = []) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg.startsWith("--")) {
+      if (optionsWithValues.includes(arg)) {
+        index += 1;
+      }
+      continue;
+    }
+    values.push(arg);
+  }
+  return values;
+}
+
+export function parseInventoryArgs(args) {
+  return {
+    values: withoutFlags(args),
+    debugRaw: args.includes("--debug-raw"),
+  };
+}
+
+export function parseItemDumpArgs(args) {
+  const section = optionValue(args, "--section");
+  return {
+    section,
+    values: positionalArgs(args, ["--section"]),
+    debugRaw: args.includes("--debug-raw"),
+  };
 }
 
 export async function command(args) {
@@ -171,6 +215,38 @@ export async function command(args) {
 
   if (area === "overview") {
     print(compactProfileOverview(await fetchProfileContext(action, rest[0])));
+    return;
+  }
+
+  if (area === "inventory") {
+    const args = [action, ...rest].filter(Boolean);
+    const parsed = parseInventoryArgs(args);
+    print(await inventoryForPlayer(parsed.values[0], parsed.values[1], { debugRaw: parsed.debugRaw }));
+    return;
+  }
+
+  if (area === "inventory-section") {
+    const values = withoutFlags(rest);
+    print(await inventorySectionForPlayer(action, values[0], values[1], { debugRaw: rest.includes("--debug-raw") }));
+    return;
+  }
+
+  if (area === "item-dump") {
+    const args = [action, ...rest].filter(Boolean);
+    const parsed = parseItemDumpArgs(args);
+    if (!parsed.section) {
+      throw new Error("Usage: skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section>");
+    }
+    const result = await inventorySectionForPlayer(parsed.section, parsed.values[0], parsed.values[1], { debugRaw: parsed.debugRaw });
+    print({
+      uuid: result.uuid,
+      profile: result.profile,
+      section: result.section,
+      sourcePath: result.sourcePath,
+      itemCount: result.itemCount,
+      items: result.items,
+      warnings: result.warnings,
+    });
     return;
   }
 

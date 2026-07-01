@@ -49,6 +49,9 @@ bun .\scripts\skyagent.ts resolve YourMinecraftName
 bun .\scripts\skyagent.ts profiles
 bun .\scripts\skyagent.ts profiles-summary
 bun .\scripts\skyagent.ts overview
+bun .\scripts\skyagent.ts inventory
+bun .\scripts\skyagent.ts inventory-section armor
+bun .\scripts\skyagent.ts item-dump --section accessory_bag
 bun .\scripts\skyagent.ts skycrypt YourMinecraftName
 bun .\scripts\skyagent.ts resource items
 bun .\scripts\skyagent.ts bazaar
@@ -69,7 +72,7 @@ Source priority should generally be: live API data, official patch notes, offici
 
 ## API Notes
 
-Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; decoding that is intentionally left for a later parser module.
+Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; SkyAgent decodes supported inventory sections through `packages/core/src/nbt.ts` and `packages/core/src/inventory.ts`.
 
 See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, and `docs/parity-spec.md` for the detailed missing-parity implementation spec.
 

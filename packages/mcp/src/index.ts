@@ -2,6 +2,7 @@
 
 import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
+import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
 const tools = [
@@ -118,6 +119,49 @@ const tools = [
         player: { type: "string" },
         profile: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_inventory",
+    description: "Decode all supported Hypixel SkyBlock inventory sections for a player/profile. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        debugRaw: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_inventory_section",
+    description: "Decode one Hypixel SkyBlock inventory section such as inventory, armor, equipment, wardrobe, ender_chest, backpacks, accessory_bag, personal_vault, or pets. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: { type: "string" },
+        player: { type: "string" },
+        profile: { type: "string" },
+        debugRaw: { type: "boolean" },
+      },
+      required: ["section"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_item_dump",
+    description: "Decode one inventory section and return its extracted item stacks for debugging and downstream normalization. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: { type: "string" },
+        player: { type: "string" },
+        profile: { type: "string" },
+        debugRaw: { type: "boolean" },
+      },
+      required: ["section"],
       additionalProperties: false,
     },
   },
@@ -295,6 +339,22 @@ async function callTool(name: string, args: Record<string, any> = {}) {
     }
     case "skyblock_profile_overview":
       return compactProfileOverview(await fetchProfileContext(args.player, args.profile));
+    case "skyblock_inventory":
+      return inventoryForPlayer(args.player, args.profile, { debugRaw: Boolean(args.debugRaw) });
+    case "skyblock_inventory_section":
+      return inventorySectionForPlayer(args.section, args.player, args.profile, { debugRaw: Boolean(args.debugRaw) });
+    case "skyblock_item_dump": {
+      const result = await inventorySectionForPlayer(args.section, args.player, args.profile, { debugRaw: Boolean(args.debugRaw) });
+      return {
+        uuid: result.uuid,
+        profile: result.profile,
+        section: result.section,
+        sourcePath: result.sourcePath,
+        itemCount: result.itemCount,
+        items: result.items,
+        warnings: result.warnings,
+      };
+    }
     case "skycrypt_profile_url":
       return { url: skycryptUrl(args.player, args.profileName) };
     case "skyblock_profile":

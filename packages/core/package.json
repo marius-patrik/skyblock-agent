@@ -5,7 +5,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./hypixel": "./src/hypixel.ts",
+    "./inventory": "./src/inventory.ts",
+    "./nbt": "./src/nbt.ts",
     "./profile": "./src/profile.ts",
     "./store": "./src/store.ts"
+  },
+  "dependencies": {
+    "prismarine-nbt": "^2.8.0"
   }
 }
