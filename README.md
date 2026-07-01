@@ -110,6 +110,14 @@ Release artifacts are written under `dist/release/<target>/` for:
 
 Unix release builds require the `zip` CLI, and Unix installs require `unzip`.
 
+Release automation dry-runs on pull requests and publishes only on pushes to `main`. The release workflow computes the next pride-version tag from the latest `vX.Y.Z` tag and the merged PR labels:
+
+- `release:patch`
+- `release:minor`
+- `release:major`
+
+Every published release includes the standalone archives, `SHA256SUMS.txt`, and `update.json`.
+
 Install from a release archive on Windows:
 
 ```powershell

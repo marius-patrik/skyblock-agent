@@ -5,7 +5,9 @@ import os from "node:os";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dir, "..");
-const expectedVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version ?? "0.0.0";
+const expectedVersion = process.argv[2]
+  ?? JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version
+  ?? "0.0.0";
 
 function currentTarget() {
   const platform = os.platform();

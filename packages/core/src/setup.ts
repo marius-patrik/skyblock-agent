@@ -3,6 +3,8 @@ import { hypixelRequest, resolveMinecraftUsername, skyblockProfiles } from "./hy
 import { profileSummaries } from "./profile.ts";
 import { dataDir, getApiKey, publicConfig, readConfig, setConfigValue } from "./store.ts";
 
+declare const SKYAGENT_BUILD_VERSION: string | undefined;
+
 type SetupInput = {
   username?: string | null;
   apiKey?: string | null;
@@ -21,6 +23,9 @@ type SetupDeps = {
 };
 
 function packageVersion() {
+  if (typeof SKYAGENT_BUILD_VERSION === "string") {
+    return SKYAGENT_BUILD_VERSION;
+  }
   return packageMetadata.version ?? "unknown";
 }
 

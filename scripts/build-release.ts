@@ -6,7 +6,7 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dir, "..");
 const outRoot = path.join(root, "dist", "release");
-const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version ?? "0.0.0";
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 const targets = [
   { id: "windows-x64", bunTarget: "bun-windows-x64", exe: "skyagent.exe" },
@@ -59,7 +59,18 @@ function zipTarget(targetDir: string, zipPath: string) {
   run(["zip", "-qr", zipPath, "."], targetDir);
 }
 
+function optionValue(name: string) {
+  const args = process.argv.slice(2);
+  const inline = args.find((arg) => arg.startsWith(`${name}=`));
+  if (inline) {
+    return inline.slice(name.length + 1);
+  }
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
 const args = new Set(process.argv.slice(2));
+const version = optionValue("--version") ?? packageJson.version ?? "0.0.0";
 const selected = args.has("--current") ? [currentTarget()] : targets.map((target) => target.id);
 fs.mkdirSync(outRoot, { recursive: true });
 
@@ -82,6 +93,8 @@ for (const targetId of selected) {
     "--compile",
     "--target",
     target.bunTarget,
+    "--define",
+    `SKYAGENT_BUILD_VERSION=${JSON.stringify(version)}`,
     "--outfile",
     outfile,
     "./scripts/skyagent.ts",

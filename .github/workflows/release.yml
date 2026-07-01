@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  dry-run:
+    name: Pride Version Release
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install release build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Plan release
+        id: plan
+        run: bun ./scripts/plan-release.ts
+
+      - name: Build release artifacts
+        run: bun run build:release -- --version "${{ steps.plan.outputs.version }}"
+
+      - name: Smoke current release artifact
+        run: bun ./scripts/smoke-release.ts "${{ steps.plan.outputs.version }}"
+
+      - name: Write release metadata
+        run: bun ./scripts/write-release-metadata.ts "${{ steps.plan.outputs.version }}"
+
+  publish:
+    name: Pride Version Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install release build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Plan release
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun ./scripts/plan-release.ts
+
+      - name: Build release artifacts
+        run: bun run build:release -- --version "${{ steps.plan.outputs.version }}"
+
+      - name: Smoke current release artifact
+        run: bun ./scripts/smoke-release.ts "${{ steps.plan.outputs.version }}"
+
+      - name: Write release metadata
+        run: bun ./scripts/write-release-metadata.ts "${{ steps.plan.outputs.version }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ steps.plan.outputs.tag }}"
+          dist/release/skyagent-*.zip
+          dist/release/SHA256SUMS.txt
+          dist/release/update.json
+          --target "${{ github.sha }}"
+          --title "SkyAgent ${{ steps.plan.outputs.tag }}"
+          --notes-file dist/release/RELEASE_NOTES.md
