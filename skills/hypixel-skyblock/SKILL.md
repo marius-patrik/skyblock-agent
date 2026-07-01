@@ -34,13 +34,14 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyblock_normalized_items` and `skyblock_item_metadata` when stable item records or NotEnoughUpdates-style metadata are needed for item reasoning.
 - Use `skyblock_price`, `skyblock_lowest_bin`, and `skyblock_price_history` when coin values, CoflNet LBIN checks, Bazaar data, auction history, or market freshness matter. Treat bounded Hypixel auction scan results with `candidatePrice` as partial candidates unless `price` is non-null.
 - Use `skyblock_networth` for sectioned purse, bank, and item networth with unknown prices, provider freshness, assumptions, and confidence. Use `skyblock_item_networth` when only one section such as armor, equipment, wardrobe, backpacks, accessory bag, or pets is needed.
+- Use `skyblock_accessories`, `skyblock_missing_accessories`, and `skyblock_accessory_upgrades` for accessory bag state, duplicate/ignored accessories, recombobulation/enrichment signals, estimated Magical Power, missing accessories, and budget-constrained coin-per-MP rankings.
 - Use `skyblock_profile`, `skyblock_museum`, and `skyblock_garden` for profile-state analysis.
 - Use `skyblock_resource`, `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_firesales`, and `skyblock_news` for live game reference and economy context.
 - Use `skycrypt_profile_url` when the user needs a human-readable profile viewer link.
 - Use `hypixel_request` for official Hypixel v2 endpoints not covered by a dedicated tool.
 - Use SkyAgent memories for stable user preferences, selected goals, profile notes, and prior analysis summaries. Do not store secrets in memories.
 
-SkyAgent can decode inventory NBT, normalize item-stack records with optional NotEnoughUpdates-style metadata, resolve item prices through Bazaar plus CoflNet-compatible LBIN/history, and calculate conservative sectioned networth. Hypixel auction scans are bounded by default and may return partial `candidatePrice` metadata rather than a resolved LBIN. Networth totals currently include purse, bank, and resolved direct item prices; modifier valuation, museum value, missing accessories, weight, and readiness are future calculator layers unless the relevant provider code exists.
+SkyAgent can decode inventory NBT, normalize item-stack records with optional NotEnoughUpdates-style metadata, resolve item prices through Bazaar plus CoflNet-compatible LBIN/history, calculate conservative sectioned networth, and analyze accessory-bag upgrade priority. Hypixel auction scans are bounded by default and may return partial `candidatePrice` metadata rather than a resolved LBIN. Networth totals currently include purse, bank, and resolved direct item prices; modifier valuation, museum value, weight, and readiness are future calculator layers unless the relevant provider code exists.
 
 ## Secrets and Storage
 

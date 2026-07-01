@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs } from "../src/index.ts";
+import { command, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs } from "../src/index.ts";
 
 let tempHome: string | null = null;
 
@@ -42,6 +42,13 @@ describe("CLI argument parsing", () => {
   test("item-networth accepts player and profile around --section", () => {
     expect(parseItemNetworthArgs(["Notch", "Apple", "--section", "armor"])).toEqual({
       section: "armor",
+      values: ["Notch", "Apple"],
+    });
+  });
+
+  test("accessory-upgrades parses budget without treating it as a profile", () => {
+    expect(parseAccessoryUpgradeArgs(["Notch", "Apple", "--budget", "1000000"])).toEqual({
+      budget: 1_000_000,
       values: ["Notch", "Apple"],
     });
   });

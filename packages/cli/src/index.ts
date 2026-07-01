@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
+import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
@@ -36,6 +37,9 @@ Usage:
   skyagent normalize-items [nameOrUuid] [profileIdOrName]
   skyagent networth [nameOrUuid] [profileIdOrName]
   skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>
+  skyagent accessories [nameOrUuid] [profileIdOrName]
+  skyagent missing-accessories [nameOrUuid] [profileIdOrName]
+  skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>
   skyagent item <internalId>
   skyagent price <itemId>
   skyagent lbin <itemId>
@@ -118,6 +122,14 @@ export function parseItemNetworthArgs(args) {
   return {
     section,
     values: positionalArgs(args, ["--section"]),
+  };
+}
+
+export function parseAccessoryUpgradeArgs(args) {
+  const budget = optionValue(args, "--budget");
+  return {
+    budget: budget === null ? null : Number(budget),
+    values: positionalArgs(args, ["--budget"]),
   };
 }
 
@@ -287,6 +299,27 @@ export async function command(args) {
       throw new Error("Usage: skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>");
     }
     print(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section));
+    return;
+  }
+
+  if (area === "accessories") {
+    const values = withoutFlags([action, ...rest].filter(Boolean));
+    print(await accessoriesForPlayer(values[0], values[1]));
+    return;
+  }
+
+  if (area === "missing-accessories") {
+    const values = withoutFlags([action, ...rest].filter(Boolean));
+    print(await missingAccessoriesForPlayer(values[0], values[1]));
+    return;
+  }
+
+  if (area === "accessory-upgrades") {
+    const parsed = parseAccessoryUpgradeArgs([action, ...rest].filter(Boolean));
+    if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
+      throw new Error("Usage: skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
+    }
+    print(await accessoryUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget));
     return;
   }
 

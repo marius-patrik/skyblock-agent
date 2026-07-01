@@ -1,3 +1,4 @@
+export * from "./accessories.ts";
 export * from "./hypixel.ts";
 export * from "./inventory.ts";
 export * from "./items.ts";
