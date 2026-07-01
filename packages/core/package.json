@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./accessories": "./src/accessories.ts",
     "./hypixel": "./src/hypixel.ts",
     "./inventory": "./src/inventory.ts",
     "./items": "./src/items.ts",

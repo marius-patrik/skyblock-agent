@@ -14,6 +14,7 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Compact profile summaries, selected member extraction, overview metadata, and SkyCrypt URL generation.
 - Local config and memory storage outside the repo.
 - Conservative sectioned networth for purse, bank, and resolved direct item prices, with unknown prices and assumptions surfaced.
+- Accessory bag analysis with duplicate detection, recombobulation/enrichment signals, estimated Magical Power, missing accessories when metadata is available, and price-driven coin-per-MP upgrade ranking.
 
 ## Missing for SkyCrypt-Style Parity
 
@@ -21,7 +22,7 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Item normalization, enchantments, attributes, reforges, gemstones, stars, dungeon quality, and item lore parsing.
 - Armor, equipment, weapons, wardrobe, inventory, ender chest, backpack, vault, and accessory bag section views.
 - SkyCrypt/SkyHelper-grade networth calculation, including modifier, pet-level, skin, dye, museum, and miscellaneous valuables.
-- Missing accessories and cheapest-upgrade ranking.
+- SkyHelper-grade missing accessories when a full maintained accessory universe is unavailable.
 - Skill level calculation from XP tables.
 - Dungeons, Slayer, Bestiary, Mining/HotM, Farming/Garden, Trophy Fishing, Crimson Isle, Rift, Kuudra, and Collections section renderers.
 - Weight calculations such as Senither/Lily-style weight.
@@ -34,6 +35,14 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Inventory sections are separated for armor, equipment, wardrobe, inventory, ender chest, backpacks, accessory bag, personal vault, and pets when exposed by the Hypixel profile payload.
 - Item modifiers, pet levels, skins, dyes, attributes, enchantments, gemstones, recombobulation, and museum state are preserved as assumptions/context but are not independently valued yet.
 - Results include provider freshness and confidence metadata and should be treated as estimates, not authoritative SkyCrypt/SkyHelper replacements.
+
+## Current Accessory Limits
+
+- Magical Power is estimated from accessory rarity and recombobulation state unless provider metadata supplies an exact MP value.
+- Missing accessories require accessory universe metadata. When no full provider is configured, SkyAgent reports owned accessory state and a structured warning instead of inventing missing items.
+- Upgrade rankings include only resolved prices; unknown and partial candidate prices are surfaced but excluded from budget rankings.
+- Accessory family/upgrade-chain handling depends on explicit provider metadata. Hypixel item resources do not expose upgrade-chain families, so those IDs are treated as their own families until a richer maintained provider is configured.
+- Budget rankings recommend only the next missing MP step per accessory family until provider metadata can model cumulative chain dependencies.
 
 ## Common Tool Signals
 

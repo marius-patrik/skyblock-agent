@@ -1,0 +1,240 @@
+import { gzipSync } from "node:zlib";
+import { describe, expect, test } from "bun:test";
+import nbt from "prismarine-nbt";
+import { accessoryMetadataProviderResult, calculateAccessoriesFromMember, hypixelAccessoryMetadataProvider, unavailableAccessoryMetadataProvider } from "../src/accessories.ts";
+import { metadataProviderResult } from "../src/items.ts";
+
+function item(slot: number, internalId: string, _rarity = "RARE", extra: Record<string, any> = {}) {
+  return {
+    Slot: { type: "byte", value: slot },
+    id: { type: "string", value: "minecraft:skull" },
+    Count: { type: "byte", value: 1 },
+    Damage: { type: "short", value: 0 },
+    tag: {
+      type: "compound",
+      value: {
+        display: {
+          type: "compound",
+          value: {
+            Name: { type: "string", value: internalId },
+          },
+        },
+        ExtraAttributes: {
+          type: "compound",
+          value: {
+            id: { type: "string", value: internalId },
+            ...Object.fromEntries(Object.entries(extra).map(([key, value]) => [key, { type: "string", value: String(value) }])),
+          },
+        },
+      },
+    },
+  };
+}
+
+function payload(items: any[]) {
+  return gzipSync(nbt.writeUncompressed({
+    type: "compound",
+    name: "",
+    value: {
+      i: {
+        type: "list",
+        value: {
+          type: "compound",
+          value: items,
+        },
+      },
+    },
+  } as any)).toString("base64");
+}
+
+function memberWithAccessories(items: any[]) {
+  return {
+    inventory: {
+      bag_contents: { data: payload(items) },
+    },
+  };
+}
+
+function metadataProvider(internalId: string) {
+  const tiers = {
+    SPEED_TALISMAN: "COMMON",
+    SPEED_RING: "UNCOMMON",
+    SPEED_ARTIFACT: "RARE",
+    VACCINE_TALISMAN: "COMMON",
+    SHINY_RELIC: "EPIC",
+  };
+  return metadataProviderResult(internalId, {
+    displayname: internalId.replace(/_/g, " "),
+    tier: tiers[internalId] ?? "COMMON",
+    category: "ACCESSORY",
+  }, "fixture-neu");
+}
+
+function priceProvider(prices: Record<string, number | null>) {
+  return async (internalId: string) => ({
+    itemId: internalId,
+    price: prices[internalId] ?? null,
+    currency: "coins",
+    confidence: prices[internalId] == null ? "none" : "medium",
+    provider: {
+      source: "fixture-prices",
+      method: "fixture",
+      url: null,
+      fetchedAt: "2026-07-01T00:00:00.000Z",
+      cacheStatus: prices[internalId] == null ? "unavailable" : "hit",
+      stale: false,
+    },
+    fallbackChain: ["fixture"],
+    warnings: prices[internalId] == null ? [{ code: "price_unavailable", message: `No price for ${internalId}.` }] : [],
+  });
+}
+
+const accessoryUniverse = () => accessoryMetadataProviderResult([
+  { internalId: "SPEED_TALISMAN", displayName: "Speed Talisman", rarity: "COMMON", family: "SPEED" },
+  { internalId: "SPEED_RING", displayName: "Speed Ring", rarity: "UNCOMMON", family: "SPEED" },
+  { internalId: "SPEED_ARTIFACT", displayName: "Speed Artifact", rarity: "RARE", family: "SPEED" },
+  { internalId: "VACCINE_TALISMAN", displayName: "Vaccine Talisman", rarity: "COMMON", family: "VACCINE" },
+  { internalId: "SHINY_RELIC", displayName: "Shiny Relic", rarity: "EPIC", family: "SHINY", magicalPower: 12 },
+], "fixture-accessories");
+
+describe("accessory analysis", () => {
+  test("detects active accessories, duplicates, recombobulation, enrichment, and missing families", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "SPEED_TALISMAN", "COMMON"),
+      item(1, "SPEED_RING", "UNCOMMON", { rarity_upgrades: 1, talisman_enrichment: "strength" }),
+      item(2, "VACCINE_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({ SPEED_ARTIFACT: 900_000, SHINY_RELIC: 2_400_000 }),
+    });
+
+    expect(result.activeAccessories.map((entry) => entry.internalId).sort()).toEqual(["SPEED_RING", "VACCINE_TALISMAN"]);
+    expect(result.duplicates).toHaveLength(1);
+    expect(result.activeAccessories.find((entry) => entry.internalId === "SPEED_RING")?.recombobulated).toBe(true);
+    expect(result.activeAccessories.find((entry) => entry.internalId === "SPEED_RING")?.enrichment.enriched).toBe(true);
+    expect(result.magicalPower.estimated).toBe(11);
+    expect(result.missing.map((entry) => entry.internalId).sort()).toEqual(["SHINY_RELIC", "SPEED_ARTIFACT"]);
+  });
+
+  test("does not recommend lower-tier duplicates when a higher family tier is active", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "SPEED_TALISMAN", "COMMON"),
+      item(1, "SPEED_RING", "UNCOMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({
+        SPEED_TALISMAN: 90_000,
+        SPEED_ARTIFACT: 700_000,
+      }),
+    });
+
+    expect(result.duplicates.map((entry) => entry.internalId)).toContain("SPEED_TALISMAN");
+    expect(result.missing.map((entry) => entry.internalId)).not.toContain("SPEED_TALISMAN");
+    expect(result.upgrades.map((entry) => entry.internalId)).toContain("SPEED_ARTIFACT");
+  });
+
+  test("normalizes very special rarity and special recombobulation MP", async () => {
+    const universe = () => accessoryMetadataProviderResult([
+      { internalId: "SPECIAL_THING", displayName: "Special Thing", rarity: "SPECIAL", family: "SPECIAL_THING" },
+      { internalId: "VERY_SPECIAL_THING", displayName: "Very Special Thing", rarity: "VERY_SPECIAL", family: "VERY_SPECIAL_THING" },
+    ], "fixture-accessories");
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "SPECIAL_THING", "SPECIAL", { rarity_upgrades: 1 }),
+      item(1, "VERY_SPECIAL_THING", "VERY_SPECIAL"),
+    ]), {
+      metadataProvider: (internalId) => metadataProviderResult(internalId, {
+        displayname: internalId,
+        tier: internalId === "SPECIAL_THING" ? "SPECIAL" : "VERY_SPECIAL",
+        category: "ACCESSORY",
+      }, "fixture-neu"),
+      accessoryMetadataProvider: universe,
+      priceProvider: priceProvider({}),
+    });
+
+    expect(result.activeAccessories.map((entry) => [entry.internalId, entry.magicalPower])).toEqual([
+      ["SPECIAL_THING", 5],
+      ["VERY_SPECIAL_THING", 5],
+    ]);
+  });
+
+  test("ranks upgrades by coin per magical power and filters by budget", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "VACCINE_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({
+        SPEED_TALISMAN: 90_000,
+        SHINY_RELIC: 2_400_000,
+      }),
+      budget: 100_000,
+    });
+
+    expect(result.cheapestMissing.map((entry) => [entry.internalId, entry.coinPerMagicalPower])).toMatchInlineSnapshot(`
+      [
+        [
+          "SPEED_TALISMAN",
+          30000,
+        ],
+        [
+          "SHINY_RELIC",
+          200000,
+        ],
+      ]
+    `);
+    expect(result.upgrades.map((entry) => entry.internalId)).toEqual(["SPEED_TALISMAN"]);
+  });
+
+  test("recommends higher-tier accessories within an owned upgrade family", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "SPEED_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({
+        SPEED_RING: 250_000,
+        SPEED_ARTIFACT: 700_000,
+      }),
+    });
+
+    expect(result.missing.map((entry) => entry.internalId)).toContain("SPEED_RING");
+    expect(result.missing.map((entry) => entry.internalId)).toContain("SPEED_ARTIFACT");
+    expect(result.upgrades.map((entry) => [entry.internalId, entry.magicalPowerGain])).toContainEqual(["SPEED_RING", 2]);
+    expect(result.upgrades.map((entry) => entry.internalId)).not.toContain("SPEED_ARTIFACT");
+  });
+
+  test("surfaces missing metadata fallback behavior", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "SPEED_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: unavailableAccessoryMetadataProvider,
+      priceProvider: priceProvider({}),
+    });
+
+    expect(result.providerFreshness[0].cacheStatus).toBe("unavailable");
+    expect(result.warnings.some((warning) => warning.code === "accessory_metadata_unavailable")).toBe(true);
+    expect(result.missing).toEqual([]);
+  });
+
+  test("maps Hypixel item resources into accessory universe metadata", async () => {
+    const result = await hypixelAccessoryMetadataProvider({
+      requestImpl: async () => ({
+        url: "https://api.hypixel.net/v2/resources/skyblock/items",
+        body: {
+          items: [
+            { id: "SPEED_TALISMAN", name: "Speed Talisman", tier: "COMMON", category: "ACCESSORY" },
+            { id: "SPEED_RING", name: "Speed Ring", tier: "UNCOMMON", category: "ACCESSORY" },
+            { id: "ASPECT_OF_THE_END", name: "Aspect of the End", tier: "RARE", category: "SWORD" },
+          ],
+        },
+      }),
+    });
+
+    expect(result.accessories.map((entry) => entry.internalId)).toEqual(["SPEED_TALISMAN", "SPEED_RING"]);
+    expect(result.accessories[0].family).toBe("SPEED_TALISMAN");
+    expect(result.provider.source).toBe("Hypixel Resources");
+  });
+});

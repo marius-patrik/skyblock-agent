@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
+import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
@@ -203,6 +204,43 @@ const tools = [
         profile: { type: "string" },
       },
       required: ["section"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_accessories",
+    description: "Analyze accessory bag state, duplicates, recombobulation, enrichment signals, estimated Magical Power, missing accessories, and upgrade rankings. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_missing_accessories",
+    description: "List missing accessories and cheapest missing accessory candidates. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_accessory_upgrades",
+    description: "Rank missing accessory upgrades by coin per Magical Power, optionally filtered by budget. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        budget: { type: "number" },
+      },
       additionalProperties: false,
     },
   },
@@ -447,6 +485,15 @@ async function callTool(name: string, args: Record<string, any> = {}) {
       return networthForPlayer(args.player, args.profile);
     case "skyblock_item_networth":
       return itemNetworthForPlayer(args.player, args.profile, args.section);
+    case "skyblock_accessories":
+      return accessoriesForPlayer(args.player, args.profile);
+    case "skyblock_missing_accessories":
+      return missingAccessoriesForPlayer(args.player, args.profile);
+    case "skyblock_accessory_upgrades":
+      if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
+        throw new Error("budget must be a non-negative finite number when provided.");
+      }
+      return accessoryUpgradesForPlayer(args.player, args.profile, args.budget ?? null);
     case "skyblock_item_metadata":
       return itemMetadata(args.internalId);
     case "skyblock_price":
