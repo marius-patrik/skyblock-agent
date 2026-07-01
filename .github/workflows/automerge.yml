@@ -49,6 +49,7 @@ jobs:
             ));
 
       - name: Verify gate checks passed
+        id: gates
         if: ${{ steps.find.outputs.eligible == 'true' }}
         uses: actions/github-script@v7
         with:
@@ -67,17 +68,23 @@ jobs:
               const run = latest.get(name);
               if (!run) {
                 core.info(`Required check not found yet: ${name}`);
-                core.setFailed(`Required check not found: ${name}`);
+                core.setOutput("passed", "false");
                 return;
               }
               if (run.conclusion !== "success") {
-                core.setFailed(`Required check ${name} is ${run.conclusion || run.status}`);
+                core.info(`Required check ${name} is ${run.conclusion || run.status}`);
+                core.setOutput("passed", "false");
                 return;
               }
             }
+            core.setOutput("passed", "true");
+
+      - name: Checkout trusted merge context
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        uses: actions/checkout@v4
 
       - name: Squash merge PR
-        if: ${{ steps.find.outputs.eligible == 'true' }}
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.find.outputs.number }}
