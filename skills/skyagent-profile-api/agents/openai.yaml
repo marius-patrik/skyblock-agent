@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Profile/API"
+  short_description: "Resolve players and fetch profile data."
+  default_prompt: "Use $skyagent-profile-api to fetch the selected SkyBlock profile overview."
+policy:
+  allow_implicit_invocation: true

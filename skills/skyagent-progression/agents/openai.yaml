@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Progression"
+  short_description: "Summarize profile progression."
+  default_prompt: "Use $skyagent-progression to check my Dungeons and Mining readiness."
+policy:
+  allow_implicit_invocation: true

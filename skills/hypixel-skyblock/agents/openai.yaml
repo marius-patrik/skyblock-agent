@@ -1,0 +1,6 @@
+interface:
+  display_name: "Hypixel SkyBlock"
+  short_description: "Orchestrate SkyAgent profile analysis."
+  default_prompt: "Use $hypixel-skyblock to analyze my SkyBlock profile and route to the right SkyAgent subskill."
+policy:
+  allow_implicit_invocation: true

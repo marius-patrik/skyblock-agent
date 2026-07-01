@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Inventory"
+  short_description: "Decode inventories and normalize items."
+  default_prompt: "Use $skyagent-inventory-items to inspect my armor and equipment sections."
+policy:
+  allow_implicit_invocation: true

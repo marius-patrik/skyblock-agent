@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Economy"
+  short_description: "Price items and estimate networth."
+  default_prompt: "Use $skyagent-economy to calculate my networth and unknown prices."
+policy:
+  allow_implicit_invocation: true

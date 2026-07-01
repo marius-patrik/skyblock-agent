@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Planning"
+  short_description: "Plan goals and next upgrades."
+  default_prompt: "Use $skyagent-planning to make a budgeted plan for my next SkyBlock goal."
+policy:
+  allow_implicit_invocation: true

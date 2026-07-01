@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Providers"
+  short_description: "Verify providers and meta freshness."
+  default_prompt: "Use $skyagent-provider-maintenance to verify whether this SkyBlock recommendation is current."
+policy:
+  allow_implicit_invocation: true

@@ -34,6 +34,15 @@ Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. D
 - Keep interactive terminal UI work in `packages/tui/` and depend on `@skyagent/core`; do not import CLI or MCP internals.
 - Keep web app work in `packages/web/` using Bun, Rsbuild, React, TypeScript, and shadcn/ui conventions; depend on `@skyagent/core` rather than importing CLI, MCP, or TUI internals.
 
+## Skillset Maintenance
+
+- Keep `skills/hypixel-skyblock` as the broad orchestration skill for general user requests and cross-domain routing.
+- Add focused SkyAgent subskills under `skills/skyagent-*` for stable domains: profile/API lookup, inventory/items, economy/pricing/networth, accessories/upgrades, progression/readiness, goal planning, and provider maintenance/meta verification.
+- Each skill folder must contain a concise `SKILL.md` with clear trigger language in frontmatter and an `agents/openai.yaml` with display metadata.
+- Keep subskill bodies short; move detailed domain tables or long procedures into `references/` only when a future issue needs them.
+- When MCP tools are added, update the broad orchestration skill and any focused subskill that should prefer those tools.
+- Run skill validation for every folder under `skills/` before opening a PR that changes skill content or routing.
+
 ## API and Tool Design
 
 - Every high-value CLI operation should have a matching MCP tool.

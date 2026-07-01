@@ -18,10 +18,21 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 ## Default Analysis Flow
 
 1. Identify the user's concrete target and constraints.
-2. Pull current profile state through SkyAgent MCP tools when available.
-3. Check whether the target depends on recent patches, economy shifts, or known meta changes.
-4. Compare the user's current bottlenecks against the target.
-5. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+2. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression/readiness, planning, or provider maintenance.
+3. Pull current profile state through SkyAgent MCP tools when available.
+4. Check whether the target depends on recent patches, economy shifts, or known meta changes.
+5. Compare the user's current bottlenecks against the target.
+6. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+
+## Subskill Routing
+
+- Use `$skyagent-profile-api` for player resolution, profile selection, overview, member payloads, museum, garden, bingo, or raw Hypixel endpoints.
+- Use `$skyagent-inventory-items` for inventory sections, item dumps, normalized items, NBT state, item metadata, or modifier reasoning.
+- Use `$skyagent-economy` for prices, Bazaar, auctions, LBIN, price history, networth, provider confidence, or market uncertainty.
+- Use `$skyagent-accessories` for Magical Power, accessory bag state, missing accessories, duplicates, enrichment, recombobulation, or budgeted MP upgrades.
+- Use `$skyagent-progression` for profile sections, XP curves, skills, Dungeons, Slayer, Mining/HotM, Garden, weight, or readiness.
+- Use `$skyagent-planning` for goal plans, next upgrades, blockers, daily/weekly routes, and what to skip.
+- Use `$skyagent-provider-maintenance` for patch-sensitive metas, provider freshness, stale formulas, parity assumptions, or official-source verification.
 
 ## SkyAgent Tooling
 

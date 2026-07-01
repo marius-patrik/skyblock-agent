@@ -1,0 +1,6 @@
+interface:
+  display_name: "SkyAgent Accessories"
+  short_description: "Rank Magical Power upgrades."
+  default_prompt: "Use $skyagent-accessories to find my best accessory upgrades under budget."
+policy:
+  allow_implicit_invocation: true
