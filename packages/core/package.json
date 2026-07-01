@@ -8,6 +8,7 @@
     "./inventory": "./src/inventory.ts",
     "./items": "./src/items.ts",
     "./nbt": "./src/nbt.ts",
+    "./prices": "./src/prices.ts",
     "./profile": "./src/profile.ts",
     "./store": "./src/store.ts"
   },

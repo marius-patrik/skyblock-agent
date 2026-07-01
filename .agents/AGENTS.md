@@ -42,6 +42,7 @@ Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. D
 - Prefer compact summaries for planning workflows and raw payload access for debugging.
 - Inventory commands and MCP tools should keep raw decoded NBT behind an explicit debug option.
 - Item normalization should stay deterministic and should include metadata provider provenance and fallback warnings.
+- Price providers must return confidence, provider method, cache status, stale status, fallback chain, and warnings instead of inventing values.
 
 ## Parity Roadmap
 

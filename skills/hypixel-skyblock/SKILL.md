@@ -32,13 +32,14 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyblock_profile_member` when detailed per-member profile data is needed for manual analysis.
 - Use `skyblock_inventory`, `skyblock_inventory_section`, and `skyblock_item_dump` when item stacks, inventory API state, armor/equipment/wardrobe, backpacks, accessory bag, personal vault, or raw decoded item payloads are needed.
 - Use `skyblock_normalized_items` and `skyblock_item_metadata` when stable item records or NotEnoughUpdates-style metadata are needed for item reasoning.
+- Use `skyblock_price`, `skyblock_lowest_bin`, and `skyblock_price_history` when coin values, CoflNet LBIN checks, Bazaar data, auction history, or market freshness matter. Treat bounded Hypixel auction scan results with `candidatePrice` as partial candidates unless `price` is non-null.
 - Use `skyblock_profile`, `skyblock_museum`, and `skyblock_garden` for profile-state analysis.
 - Use `skyblock_resource`, `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_firesales`, and `skyblock_news` for live game reference and economy context.
 - Use `skycrypt_profile_url` when the user needs a human-readable profile viewer link.
 - Use `hypixel_request` for official Hypixel v2 endpoints not covered by a dedicated tool.
 - Use SkyAgent memories for stable user preferences, selected goals, profile notes, and prior analysis summaries. Do not store secrets in memories.
 
-SkyAgent can decode inventory NBT and normalize item-stack records with optional NotEnoughUpdates-style metadata. It does not yet calculate SkyCrypt/SkyHelper-grade networth, weight, or missing accessories. Treat those as future calculator layers unless the relevant provider code exists.
+SkyAgent can decode inventory NBT, normalize item-stack records with optional NotEnoughUpdates-style metadata, and resolve item prices through Bazaar plus CoflNet-compatible LBIN/history. Hypixel auction scans are bounded by default and may return partial `candidatePrice` metadata rather than a resolved LBIN. It does not yet calculate SkyCrypt/SkyHelper-grade networth, weight, or missing accessories. Treat those as future calculator layers unless the relevant provider code exists.
 
 ## Secrets and Storage
 

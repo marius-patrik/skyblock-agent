@@ -4,6 +4,7 @@ import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setCon
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
 function print(value, pretty = true) {
@@ -33,6 +34,9 @@ Usage:
   skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section> [--debug-raw]
   skyagent normalize-items [nameOrUuid] [profileIdOrName]
   skyagent item <internalId>
+  skyagent price <itemId>
+  skyagent lbin <itemId>
+  skyagent price-history <itemId> [window]
   skyagent skycrypt [nameOrUuid] [profileName]
   skyagent museum [profileId]
   skyagent garden [profileId]
@@ -264,6 +268,30 @@ export async function command(args) {
       throw new Error("Usage: skyagent item <internalId>");
     }
     print(await itemMetadata(action));
+    return;
+  }
+
+  if (area === "price") {
+    if (!action) {
+      throw new Error("Usage: skyagent price <itemId>");
+    }
+    print(await itemPrice(action));
+    return;
+  }
+
+  if (area === "lbin") {
+    if (!action) {
+      throw new Error("Usage: skyagent lbin <itemId>");
+    }
+    print(await lowestBin(action));
+    return;
+  }
+
+  if (area === "price-history") {
+    if (!action) {
+      throw new Error("Usage: skyagent price-history <itemId> [window]");
+    }
+    print(await coflnetPriceHistory(action, rest[0]));
     return;
   }
 

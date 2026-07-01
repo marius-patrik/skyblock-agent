@@ -4,6 +4,7 @@ import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } f
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
 const tools = [
@@ -187,6 +188,39 @@ const tools = [
         internalId: { type: "string" },
       },
       required: ["internalId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_price",
+    description: "Resolve a SkyBlock item price through Bazaar first, then CoflNet LBIN fallback; bounded Hypixel auction scans are exposed as partial candidates with warnings.",
+    inputSchema: {
+      type: "object",
+      properties: { itemId: { type: "string" } },
+      required: ["itemId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_lowest_bin",
+    description: "Resolve current CoflNet-compatible LBIN for an auctionable SkyBlock item, with bounded Hypixel auction scans exposed as partial candidate metadata.",
+    inputSchema: {
+      type: "object",
+      properties: { itemId: { type: "string" } },
+      required: ["itemId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_price_history",
+    description: "Fetch CoflNet-compatible price history/analysis for a SkyBlock item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        itemId: { type: "string" },
+        window: { type: "string" },
+      },
+      required: ["itemId"],
       additionalProperties: false,
     },
   },
@@ -384,6 +418,12 @@ async function callTool(name: string, args: Record<string, any> = {}) {
       return normalizedItemsForPlayer(args.player, args.profile);
     case "skyblock_item_metadata":
       return itemMetadata(args.internalId);
+    case "skyblock_price":
+      return itemPrice(args.itemId);
+    case "skyblock_lowest_bin":
+      return lowestBin(args.itemId);
+    case "skyblock_price_history":
+      return coflnetPriceHistory(args.itemId, args.window);
     case "skycrypt_profile_url":
       return { url: skycryptUrl(args.player, args.profileName) };
     case "skyblock_profile":

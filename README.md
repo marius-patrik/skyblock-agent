@@ -54,6 +54,9 @@ bun .\scripts\skyagent.ts inventory-section armor
 bun .\scripts\skyagent.ts item-dump --section accessory_bag
 bun .\scripts\skyagent.ts normalize-items
 bun .\scripts\skyagent.ts item HYPERION
+bun .\scripts\skyagent.ts price ENCHANTED_DIAMOND
+bun .\scripts\skyagent.ts lbin HYPERION
+bun .\scripts\skyagent.ts price-history HYPERION 30d
 bun .\scripts\skyagent.ts skycrypt YourMinecraftName
 bun .\scripts\skyagent.ts resource items
 bun .\scripts\skyagent.ts bazaar
@@ -77,6 +80,8 @@ Source priority should generally be: live API data, official patch notes, offici
 Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; SkyAgent decodes supported inventory sections through `packages/core/src/nbt.ts` and `packages/core/src/inventory.ts`, then normalizes item stacks through `packages/core/src/items.ts`.
 
 Item metadata uses the NotEnoughUpdates item repository as an optional provider. Outputs include provider source, URL, fetch time, cache status, and warnings when metadata is unavailable.
+
+Price results use Hypixel Bazaar for Bazaar products and CoflNet-compatible endpoints for LBIN/history. Bounded Hypixel active-auction scans can expose partial `candidatePrice` metadata for auctionable items, but only complete scans or direct providers populate resolved `price`. Outputs include provider method, confidence, cache status, stale status, fallback chain, and warnings.
 
 See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, and `docs/parity-spec.md` for the detailed missing-parity implementation spec.
 
