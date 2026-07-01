@@ -80,8 +80,23 @@ bun .\scripts\skyagent.ts memory add "Working toward F7 completion" goal dungeon
 ```powershell
 bun run typecheck
 bun run tui
+bun .\scripts\skyagent.ts tui
 bun run dev:web
 bun run build:web
+```
+
+## TUI
+
+Launch the interactive terminal UI with:
+
+```powershell
+bun .\scripts\skyagent.ts tui
+```
+
+The TUI opens directly into config/status, profile selection, profile overview, raw API/debug launcher, and advanced-section status screens. It uses keyboard navigation (`up`/`down` or `j`/`k` for screens, `left`/`right` or `h`/`l` for lists, `enter`, `r`, `q`) and never prints API key values. The initial implementation uses Node `readline` primitives instead of a rendering dependency to keep Windows Terminal, VS Code terminal, and GitHub Actions smoke behavior predictable. CI can initialize the same entry point without live credentials through:
+
+```powershell
+bun .\scripts\skyagent.ts tui --smoke
 ```
 
 ## Data Sources

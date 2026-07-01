@@ -17,7 +17,7 @@
     "tui": "bun ./packages/tui/src/bin.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple",
+    "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple && bun ./scripts/skyagent.ts tui --smoke",
     "validate:plugin": "bun ./scripts/ci/validate-plugin.ts",
     "validate:skill": "bun ./scripts/ci/validate-skill.ts"
   },
@@ -25,7 +25,8 @@
   "dependencies": {
     "@skyagent/cli": "workspace:*",
     "@skyagent/core": "workspace:*",
-    "@skyagent/mcp": "workspace:*"
+    "@skyagent/mcp": "workspace:*",
+    "@skyagent/tui": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
