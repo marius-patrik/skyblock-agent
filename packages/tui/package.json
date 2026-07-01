@@ -1,0 +1,17 @@
+{
+  "name": "@skyagent/tui",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "skyagent-tui": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun ./src/bin.ts"
+  },
+  "dependencies": {
+    "@skyagent/core": "workspace:*"
+  }
+}

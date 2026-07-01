@@ -24,8 +24,15 @@
       ],
       "@skyagent/mcp": [
         "packages/mcp/src/index.ts"
+      ],
+      "@skyagent/tui": [
+        "packages/tui/src/index.ts"
+      ],
+      "@skyagent/web": [
+        "packages/web/src/main.tsx"
       ]
     },
+    "jsx": "react-jsx",
     "types": [
       "bun",
       "node"
@@ -33,6 +40,7 @@
   },
   "include": [
     "scripts/**/*.ts",
-    "packages/**/*.ts"
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
   ]
 }

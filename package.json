@@ -12,6 +12,9 @@
   "scripts": {
     "check": "bun run typecheck && bun run test && bun run smoke",
     "ci": "bun run check && bun run validate:plugin && bun run validate:skill",
+    "build:web": "bun run --cwd packages/web build",
+    "dev:web": "bun run --cwd packages/web dev",
+    "tui": "bun ./packages/tui/src/bin.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple",

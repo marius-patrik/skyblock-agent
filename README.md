@@ -16,10 +16,10 @@ The goal is to connect Codex to live player data, game reference data, and curat
 - `packages/core` contains shared Hypixel/Mojang API clients, profile helpers, config, memories, and future parsers/calculators.
 - `packages/cli` contains the Bun-powered JSON CLI command implementation.
 - `packages/mcp` contains the Bun-powered MCP server used by Codex.
+- `packages/tui` contains the future interactive terminal UI surface and depends on `@skyagent/core`.
+- `packages/web` contains the future Bun + Rsbuild + React + TypeScript + shadcn/ui web app surface and depends on `@skyagent/core`.
 - `scripts/skyagent.ts` and `scripts/mcp-server.ts` are compatibility wrappers for the root binary and plugin manifest.
 - `assets/` is reserved for plugin assets and reference fixtures.
-- Future TUI work should add a package that depends on `@skyagent/core`.
-- Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui.
 
 ## Local Setup
 
@@ -62,6 +62,15 @@ bun .\scripts\skyagent.ts resource items
 bun .\scripts\skyagent.ts bazaar
 bun .\scripts\skyagent.ts firesales
 bun .\scripts\skyagent.ts memory add "Working toward F7 completion" goal dungeon
+```
+
+## Package Commands
+
+```powershell
+bun run typecheck
+bun run tui
+bun run dev:web
+bun run build:web
 ```
 
 ## Data Sources
