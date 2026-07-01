@@ -1,6 +1,10 @@
 ---
 name: skyagent-profile-api
 description: Fetch and summarize Hypixel SkyBlock player/profile data with SkyAgent MCP tools. Use for username resolution, profile selection, online/status checks, profile overview, member payloads, museum, garden, bingo, or raw Hypixel endpoint lookup.
+metadata:
+  display_name: "SkyAgent Profile/API"
+  short_description: "Resolve players and fetch profile data."
+  default_prompt: "Use $skyagent-profile-api to fetch the selected SkyBlock profile overview."
 ---
 
 # SkyAgent Profile/API

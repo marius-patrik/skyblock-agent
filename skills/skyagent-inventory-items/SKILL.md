@@ -1,6 +1,10 @@
 ---
 name: skyagent-inventory-items
 description: Decode SkyBlock inventory sections and normalize item records with SkyAgent. Use for inventory, armor, equipment, wardrobe, backpacks, accessory bag item dumps, normalized item records, item metadata lookups, raw NBT state, pets, personal vault, and item modifier reasoning.
+metadata:
+  display_name: "SkyAgent Inventory"
+  short_description: "Decode inventories and normalize items."
+  default_prompt: "Use $skyagent-inventory-items to inspect my armor and equipment sections."
 ---
 
 # SkyAgent Inventory/Items

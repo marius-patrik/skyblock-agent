@@ -1,6 +1,10 @@
 ---
 name: hypixel-skyblock
 description: Analyze Hypixel SkyBlock profiles, progression goals, upgrade paths, and meta-sensitive recommendations using live API data and game references.
+metadata:
+  display_name: "Hypixel SkyBlock"
+  short_description: "Orchestrate SkyAgent profile analysis."
+  default_prompt: "Use $hypixel-skyblock to analyze my SkyBlock profile and route to the right SkyAgent subskill."
 ---
 
 # Hypixel SkyBlock

@@ -1,6 +1,10 @@
 ---
 name: skyagent-economy
 description: Analyze SkyBlock prices, auctions, Bazaar data, lowest BIN, price history, provider freshness, stale-cache behavior, and networth with SkyAgent. Use for coin values, item valuation, sectioned networth, item networth, unknown prices, third-party uncertainty, and market volatility.
+metadata:
+  display_name: "SkyAgent Economy"
+  short_description: "Price items and estimate networth."
+  default_prompt: "Use $skyagent-economy to calculate my networth and unknown prices."
 ---
 
 # SkyAgent Economy

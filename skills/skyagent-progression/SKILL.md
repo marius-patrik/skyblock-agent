@@ -1,6 +1,10 @@
 ---
 name: skyagent-progression
 description: Inspect SkyBlock progression sections and XP curves with SkyAgent. Use for skills, Catacombs, Slayer, Bestiary, Collections, Minions, Museum, Garden, Mining/HotM, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, unlocks, source fields, formulas, and missing-data limits.
+metadata:
+  display_name: "SkyAgent Progression"
+  short_description: "Summarize profile progression."
+  default_prompt: "Use $skyagent-progression to check my Dungeons and Mining readiness."
 ---
 
 # SkyAgent Progression

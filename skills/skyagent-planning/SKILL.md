@@ -1,6 +1,10 @@
 ---
 name: skyagent-planning
 description: Produce goal-specific SkyBlock plans and next-upgrade recommendations with SkyAgent. Use for goal plans, upgrade priority, budget-constrained recommendations, daily or weekly routes, blockers, prerequisites, source freshness, uncertainty, and what to skip.
+metadata:
+  display_name: "SkyAgent Planning"
+  short_description: "Plan goals and next upgrades."
+  default_prompt: "Use $skyagent-planning to make a budgeted plan for my next SkyBlock goal."
 ---
 
 # SkyAgent Planning

@@ -1,6 +1,10 @@
 ---
 name: skyagent-accessories
 description: Analyze SkyBlock networth-adjacent accessories and upgrade priority with SkyAgent. Use for networth, item networth, Magical Power, accessory bag state, duplicates, recombobulation/enrichment signals, missing accessories, budget-constrained coin-per-MP upgrades, missing prices, and provider uncertainty.
+metadata:
+  display_name: "SkyAgent Accessories"
+  short_description: "Rank Magical Power upgrades."
+  default_prompt: "Use $skyagent-accessories to find my best accessory upgrades under budget."
 ---
 
 # SkyAgent Accessories

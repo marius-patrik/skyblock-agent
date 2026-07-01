@@ -1,6 +1,10 @@
 ---
 name: skyagent-provider-maintenance
 description: Verify SkyBlock provider freshness, parity assumptions, and meta-sensitive claims for SkyAgent. Use for patch notes, wiki pages, official-source checks, NEU/SkyHelper/CoflNet assumptions, provider outage analysis, stale formula warnings, parity drift, and maintaining metadata assumptions.
+metadata:
+  display_name: "SkyAgent Providers"
+  short_description: "Verify providers and meta freshness."
+  default_prompt: "Use $skyagent-provider-maintenance to verify whether this SkyBlock recommendation is current."
 ---
 
 # SkyAgent Provider Maintenance

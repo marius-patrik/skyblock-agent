@@ -1,18 +1,47 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const skillsRoot = path.join(process.cwd(), "skills");
+const quickValidatePath = path.join(process.cwd(), "scripts", "ci", "quick_validate.py");
 
 function fail(message: string): never {
   console.error(`Skill validation failed: ${message}`);
   process.exit(1);
 }
 
-function skillFolders() {
-  return fs.readdirSync(skillsRoot, { withFileTypes: true })
+export function discoverSkillFolders(root = skillsRoot) {
+  return fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+}
+
+function runQuickValidate(folder: string) {
+  if (!fs.existsSync(quickValidatePath)) {
+    fail(`skill quick validator not found: ${quickValidatePath}`);
+  }
+
+  const skillPath = path.join(skillsRoot, folder);
+  const attempts = [
+    ["python", quickValidatePath, skillPath],
+    ["python3", quickValidatePath, skillPath],
+  ];
+  const errors: string[] = [];
+
+  for (const [command, ...args] of attempts) {
+    const result = spawnSync(command, args, { encoding: "utf8" });
+    if (result.error) {
+      errors.push(`${command}: ${result.error.message}`);
+      continue;
+    }
+    if (result.status === 0) {
+      return;
+    }
+    errors.push(`${command}: ${result.stderr || result.stdout}`.trim());
+  }
+
+  fail(`${folder}: quick_validate.py failed\n${errors.join("\n")}`);
 }
 
 function validateOpenAiYaml(folder: string) {
@@ -31,7 +60,44 @@ function validateOpenAiYaml(folder: string) {
   }
 }
 
+function parseSkillMetadata(frontmatter: string) {
+  const metadataMatch = frontmatter.match(/^metadata:\r?\n((?:[ \t]+[^\r\n]+\r?\n?)*)/m);
+  if (!metadataMatch) {
+    fail("SKILL.md frontmatter must include metadata");
+  }
+
+  const metadata = new Map<string, string>();
+  for (const line of metadataMatch[1].split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+    const match = line.match(/^\s+([a-z_]+):\s*(.*)$/);
+    if (!match) {
+      fail(`invalid metadata line: ${line}`);
+    }
+    metadata.set(match[1], match[2].replace(/^["']|["']$/g, "").trim());
+  }
+
+  return metadata;
+}
+
+function readOpenAiMetadata(folder: string) {
+  const metadataPath = path.join(skillsRoot, folder, "agents", "openai.yaml");
+  const text = fs.readFileSync(metadataPath, "utf8");
+  const metadata = new Map<string, string>();
+  for (const key of ["display_name", "short_description", "default_prompt"]) {
+    const value = text.match(new RegExp(`^\\s+${key}:\\s*["']?(.+?)["']?\\s*$`, "m"))?.[1]?.trim();
+    if (!value) {
+      fail(`${folder}: agents/openai.yaml must include interface.${key}`);
+    }
+    metadata.set(key, value);
+  }
+  return metadata;
+}
+
 function validateSkill(folder: string) {
+  runQuickValidate(folder);
+
   const skillPath = path.join(skillsRoot, folder, "SKILL.md");
   if (!fs.existsSync(skillPath)) {
     fail(`${folder}: SKILL.md is required`);
@@ -57,19 +123,43 @@ function validateSkill(folder: string) {
     fail(`${folder}: SKILL.md body is too short`);
   }
   validateOpenAiYaml(folder);
+
+  const skillMetadata = parseSkillMetadata(frontmatter);
+  const openAiMetadata = readOpenAiMetadata(folder);
+  for (const key of ["display_name", "short_description", "default_prompt"]) {
+    const skillValue = skillMetadata.get(key);
+    const openAiValue = openAiMetadata.get(key);
+    if (!skillValue) {
+      fail(`${folder}: frontmatter metadata.${key} is required`);
+    }
+    if (skillValue !== openAiValue) {
+      fail(`${folder}: frontmatter metadata.${key} must match agents/openai.yaml`);
+    }
+  }
 }
 
-const folders = skillFolders();
-if (folders.length === 0) {
-  fail("no skill folders found");
+function validatePluginSkillPath() {
+  const manifestPath = path.join(process.cwd(), ".codex-plugin", "plugin.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  if (manifest.skills !== "./skills/") {
+    fail("plugin manifest skills must point to ./skills/");
+  }
 }
 
-for (const folder of folders) {
-  validateSkill(folder);
-}
+export function validateSkills() {
+  const folders = discoverSkillFolders();
+  if (folders.length === 0) {
+    fail("no skill folders found");
+  }
 
-const broadSkill = fs.readFileSync(path.join(skillsRoot, "hypixel-skyblock", "SKILL.md"), "utf8");
-for (const expected of [
+  validatePluginSkillPath();
+
+  for (const folder of folders) {
+    validateSkill(folder);
+  }
+
+  const broadSkill = fs.readFileSync(path.join(skillsRoot, "hypixel-skyblock", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_profile_overview",
   "Do not store secrets in memories",
   "$skyagent-profile-api",
@@ -80,14 +170,14 @@ for (const expected of [
   "$skyagent-readiness-weight",
   "$skyagent-planning",
   "$skyagent-provider-maintenance",
-]) {
-  if (!broadSkill.includes(expected)) {
-    fail(`hypixel-skyblock must mention ${expected}`);
+  ]) {
+    if (!broadSkill.includes(expected)) {
+      fail(`hypixel-skyblock must mention ${expected}`);
+    }
   }
-}
 
-const profileSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-profile-api", "SKILL.md"), "utf8");
-for (const expected of [
+  const profileSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-profile-api", "SKILL.md"), "utf8");
+  for (const expected of [
   "hypixel_status",
   "api_disabled",
   "missing_profile",
@@ -95,14 +185,14 @@ for (const expected of [
   "online/status checks",
   "rate-limit",
   "HYPIXEL_API_KEY",
-]) {
-  if (!profileSkill.includes(expected)) {
-    fail(`skyagent-profile-api must mention ${expected}`);
+  ]) {
+    if (!profileSkill.includes(expected)) {
+      fail(`skyagent-profile-api must mention ${expected}`);
+    }
   }
-}
 
-const inventorySkill = fs.readFileSync(path.join(skillsRoot, "skyagent-inventory-items", "SKILL.md"), "utf8");
-for (const expected of [
+  const inventorySkill = fs.readFileSync(path.join(skillsRoot, "skyagent-inventory-items", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_inventory",
   "skyblock_inventory_section",
   "skyblock_item_dump",
@@ -113,14 +203,14 @@ for (const expected of [
   "disabled inventory API",
   "partial profile data",
   "item metadata is unavailable",
-]) {
-  if (!inventorySkill.includes(expected)) {
-    fail(`skyagent-inventory-items must mention ${expected}`);
+  ]) {
+    if (!inventorySkill.includes(expected)) {
+      fail(`skyagent-inventory-items must mention ${expected}`);
+    }
   }
-}
 
-const economySkill = fs.readFileSync(path.join(skillsRoot, "skyagent-economy", "SKILL.md"), "utf8");
-for (const expected of [
+  const economySkill = fs.readFileSync(path.join(skillsRoot, "skyagent-economy", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_price",
   "skyblock_lowest_bin",
   "skyblock_price_history",
@@ -132,14 +222,14 @@ for (const expected of [
   "market volatility",
   "Do not invent prices",
   "Do not add unknown prices into networth totals",
-]) {
-  if (!economySkill.includes(expected)) {
-    fail(`skyagent-economy must mention ${expected}`);
+  ]) {
+    if (!economySkill.includes(expected)) {
+      fail(`skyagent-economy must mention ${expected}`);
+    }
   }
-}
 
-const accessoriesSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-accessories", "SKILL.md"), "utf8");
-for (const expected of [
+  const accessoriesSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-accessories", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_accessories",
   "skyblock_missing_accessories",
   "skyblock_accessory_upgrades",
@@ -152,14 +242,14 @@ for (const expected of [
   "over-budget",
   "provider confidence",
   "stale-cache warnings",
-]) {
-  if (!accessoriesSkill.includes(expected)) {
-    fail(`skyagent-accessories must mention ${expected}`);
+  ]) {
+    if (!accessoriesSkill.includes(expected)) {
+      fail(`skyagent-accessories must mention ${expected}`);
+    }
   }
-}
 
-const progressionSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-progression", "SKILL.md"), "utf8");
-for (const expected of [
+  const progressionSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-progression", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_profile_section",
   "skyblock_progression",
   "$skyagent-readiness-weight",
@@ -176,14 +266,14 @@ for (const expected of [
   "currencies",
   "unlocks",
   "missing-data limits",
-]) {
-  if (!progressionSkill.includes(expected)) {
-    fail(`skyagent-progression must mention ${expected}`);
+  ]) {
+    if (!progressionSkill.includes(expected)) {
+      fail(`skyagent-progression must mention ${expected}`);
+    }
   }
-}
 
-const readinessSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-readiness-weight", "SKILL.md"), "utf8");
-for (const expected of [
+  const readinessSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-readiness-weight", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_weight",
   "skyblock_readiness",
   "Senither/Lily-style",
@@ -196,14 +286,14 @@ for (const expected of [
   "mining",
   "Verify current external meta",
   "missing-data warnings",
-]) {
-  if (!readinessSkill.includes(expected)) {
-    fail(`skyagent-readiness-weight must mention ${expected}`);
+  ]) {
+    if (!readinessSkill.includes(expected)) {
+      fail(`skyagent-readiness-weight must mention ${expected}`);
+    }
   }
-}
 
-const planningSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-planning", "SKILL.md"), "utf8");
-for (const expected of [
+  const planningSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-planning", "SKILL.md"), "utf8");
+  for (const expected of [
   "skyblock_plan_goal",
   "skyblock_next_upgrades",
   "daily/weekly routes",
@@ -219,14 +309,14 @@ for (const expected of [
   "cost/time estimate",
   "source freshness",
   "what to skip",
-]) {
-  if (!planningSkill.includes(expected)) {
-    fail(`skyagent-planning must mention ${expected}`);
+  ]) {
+    if (!planningSkill.includes(expected)) {
+      fail(`skyagent-planning must mention ${expected}`);
+    }
   }
-}
 
-const providerSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-provider-maintenance", "SKILL.md"), "utf8");
-for (const expected of [
+  const providerSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-provider-maintenance", "SKILL.md"), "utf8");
+  for (const expected of [
   "patch notes",
   "wiki pages",
   "NEU",
@@ -238,10 +328,15 @@ for (const expected of [
   "Verify live web/wiki/provider data",
   "stale-cache warnings",
   "docs/parity.md",
-]) {
-  if (!providerSkill.includes(expected)) {
-    fail(`skyagent-provider-maintenance must mention ${expected}`);
+  ]) {
+    if (!providerSkill.includes(expected)) {
+      fail(`skyagent-provider-maintenance must mention ${expected}`);
+    }
   }
+
+  console.log(`Skill validation passed (${folders.length} skills)`);
 }
 
-console.log(`Skill validation passed (${folders.length} skills)`);
+if (import.meta.main) {
+  validateSkills();
+}

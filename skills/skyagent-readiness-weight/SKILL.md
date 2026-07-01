@@ -1,6 +1,10 @@
 ---
 name: skyagent-readiness-weight
 description: Analyze SkyBlock weight estimates and activity readiness with SkyAgent. Use for Senither/Lily-style weight status, unsupported exact formulas, readiness for dungeons, slayer, kuudra, garden, or mining, formula freshness, assumptions, and missing-data limits.
+metadata:
+  display_name: "SkyAgent Readiness"
+  short_description: "Estimate weight and activity readiness."
+  default_prompt: "Use $skyagent-readiness-weight to check my dungeon readiness."
 ---
 
 # SkyAgent Readiness/Weight
