@@ -1,6 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import packageMetadata from "../../../package.json" with { type: "json" };
 import { hypixelRequest, resolveMinecraftUsername, skyblockProfiles } from "./hypixel.ts";
 import { profileSummaries } from "./profile.ts";
 import { dataDir, getApiKey, publicConfig, readConfig, setConfigValue } from "./store.ts";
@@ -23,8 +21,15 @@ type SetupDeps = {
 };
 
 function packageVersion() {
-  const packagePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../package.json");
-  return JSON.parse(fs.readFileSync(packagePath, "utf8")).version ?? "unknown";
+  return packageMetadata.version ?? "unknown";
+}
+
+function installPath() {
+  const argvPath = process.argv[1];
+  if (argvPath && !argvPath.includes("~BUN")) {
+    return argvPath;
+  }
+  return process.execPath ?? argvPath ?? null;
 }
 
 function step(id: string, status: "ok" | "missing" | "skipped", detail: string) {
@@ -50,7 +55,7 @@ export function setupStatus(deps: SetupDeps = {}) {
   const pub = deps.publicConfig ?? publicConfig;
   const config = read();
   return {
-    installPath: process.argv[1] ?? null,
+    installPath: installPath(),
     version: packageVersion(),
     dataDir: dataDir(),
     config: pub(config),
@@ -148,7 +153,7 @@ export async function runSetup(input: SetupInput = {}, deps: SetupDeps = {}) {
     selectedProfile,
     steps,
     status: {
-      installPath: process.argv[1] ?? null,
+      installPath: installPath(),
       version: packageVersion(),
       dataDir: dataDir(),
       config: pub(read()),

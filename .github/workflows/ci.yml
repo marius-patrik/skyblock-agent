@@ -22,6 +22,10 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install release build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 

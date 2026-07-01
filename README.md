@@ -44,6 +44,8 @@ SkyAgent stores config and memories outside the repo:
 ## CLI Examples
 
 ```powershell
+bun .\scripts\skyagent.ts version
+bun .\scripts\skyagent.ts doctor
 bun .\scripts\skyagent.ts config get
 bun .\scripts\skyagent.ts resolve YourMinecraftName
 bun .\scripts\skyagent.ts profiles
@@ -84,6 +86,43 @@ bun .\scripts\skyagent.ts tui
 bun run dev:web
 bun run build:web
 ```
+
+## Standalone Install And Release Artifacts
+
+Build the current host executable for CI or local smoke checks:
+
+```powershell
+bun run build:release -- --current
+```
+
+Build all supported release targets:
+
+```powershell
+bun run build:release
+```
+
+Release artifacts are written under `dist/release/<target>/` for:
+
+- `windows-x64`
+- `linux-x64`
+- `darwin-x64`
+- `darwin-arm64`
+
+Unix release builds require the `zip` CLI, and Unix installs require `unzip`.
+
+Install from a release archive on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install\install.ps1 -Archive .\dist\release\skyagent-windows-x64.zip
+```
+
+Install from a release archive on macOS/Linux:
+
+```sh
+SKYAGENT_ARCHIVE=./dist/release/skyagent-linux-x64.zip sh ./install/install.sh
+```
+
+The installers place `skyagent` in a user-local bin directory, update PATH when possible, then run `skyagent version` and `skyagent doctor`.
 
 ## TUI
 

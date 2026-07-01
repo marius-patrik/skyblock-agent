@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseSetupArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseSetupArgs } from "../src/index.ts";
 
 let tempHome: string | null = null;
 
@@ -101,6 +101,21 @@ describe("CLI argument parsing", () => {
     isolatedSkyAgentHome();
 
     await command(["setup", "--json"]);
+  });
+
+  test("version and doctor commands report install diagnostics", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["version", "--json"]);
+    await command(["doctor", "--json"]);
+    expect(doctorStatus()).toMatchObject({
+      ok: true,
+      version: "0.1.0",
+      runtime: {
+        platform: process.platform,
+        arch: process.arch,
+      },
+    });
   });
 
   test("root skyagent script delegates plan command to CLI", async () => {

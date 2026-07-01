@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
 import { createInterface } from "node:readline/promises";
+import fs from "node:fs";
+import path from "node:path";
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
@@ -33,6 +35,8 @@ Usage:
   skyagent config set api-key <key>
   skyagent setup [--json] [--username <name>] [--api-key <key>] [--profile <profileIdOrName>] [--no-write]
   skyagent setup status [--json]
+  skyagent version [--json]
+  skyagent doctor [--json]
   skyagent resolve <minecraftName>
   skyagent player [nameOrUuid]
   skyagent status [nameOrUuid]
@@ -248,6 +252,36 @@ async function promptSetupInputs(initial) {
   }
 }
 
+function pathEntries() {
+  return (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+}
+
+function commandOnPath(name: string) {
+  const candidates = process.platform === "win32" ? [`${name}.exe`, `${name}.cmd`, `${name}.bat`, name] : [name];
+  return pathEntries().some((entry) => candidates.some((candidate) => fs.existsSync(path.join(entry, candidate))));
+}
+
+export function doctorStatus() {
+  const setup = setupStatus();
+  const installDir = setup.installPath ? path.dirname(setup.installPath) : null;
+  const installDirOnPath = installDir ? pathEntries().some((entry) => path.resolve(entry).toLowerCase() === path.resolve(installDir).toLowerCase()) : false;
+  return {
+    ok: Boolean(setup.version && setup.dataDir),
+    version: setup.version,
+    installPath: setup.installPath,
+    installDir,
+    installDirOnPath,
+    skyagentOnPath: commandOnPath("skyagent"),
+    runtime: {
+      bun: typeof Bun !== "undefined" ? Bun.version : null,
+      platform: process.platform,
+      arch: process.arch,
+    },
+    dataDir: setup.dataDir,
+    config: setup.config,
+  };
+}
+
 export async function command(args) {
   const [area, action, ...rest] = args;
 
@@ -301,6 +335,19 @@ export async function command(args) {
       profile: inputs.profile,
       write: !inputs.noWrite,
     }), !compact);
+    return;
+  }
+
+  if (area === "version") {
+    const compact = [action, ...rest].includes("--json");
+    const version = setupStatus().version;
+    print({ version }, !compact);
+    return;
+  }
+
+  if (area === "doctor") {
+    const compact = [action, ...rest].includes("--json");
+    print(doctorStatus(), !compact);
     return;
   }
 

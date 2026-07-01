@@ -11,13 +11,15 @@
   },
   "scripts": {
     "check": "bun run typecheck && bun run test && bun run smoke",
-    "ci": "bun run check && bun run validate:plugin && bun run validate:skill",
+    "ci": "bun run check && bun run validate:plugin && bun run validate:skill && bun run build:release -- --current && bun run smoke:release",
     "build:web": "bun run --cwd packages/web build",
+    "build:release": "bun ./scripts/build-release.ts",
     "dev:web": "bun run --cwd packages/web dev",
     "tui": "bun ./packages/tui/src/bin.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple && bun ./scripts/skyagent.ts tui --smoke",
+    "smoke:release": "bun ./scripts/smoke-release.ts",
     "validate:plugin": "bun ./scripts/ci/validate-plugin.ts",
     "validate:skill": "bun ./scripts/ci/validate-skill.ts"
   },
