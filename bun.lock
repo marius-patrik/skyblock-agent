@@ -27,6 +27,7 @@
       "dependencies": {
         "@skyagent/core": "workspace:*",
         "@skyagent/gateway": "workspace:*",
+        "@skyagent/web": "workspace:*",
       },
     },
     "packages/core": {

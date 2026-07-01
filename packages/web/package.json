@@ -4,11 +4,21 @@
   "description": "SkyAgent Rsbuild React TypeScript web shell with shadcn/ui-style primitives.",
   "type": "module",
   "exports": {
-    ".": "./src/main.tsx"
+    ".": "./src/main.tsx",
+    "./server": "./src/server.ts",
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "src",
+    "index.html",
+    "rsbuild.config.ts",
+    "components.json"
+  ],
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
+    "prepack": "bun run build",
     "preview": "rsbuild preview"
   },
   "dependencies": {

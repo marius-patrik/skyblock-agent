@@ -13,6 +13,7 @@ import { readinessForPlayer } from "@skyagent/core/readiness";
 import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/sections";
 import { weightForPlayer } from "@skyagent/core/weight";
 import { gatewayCommand } from "./gateway.ts";
+import { webCommand } from "./web.ts";
 
 function print(value, pretty = true) {
   process.stdout.write(`${JSON.stringify(value, null, pretty ? 2 : 0)}\n`);
@@ -72,6 +73,12 @@ Usage:
   skyagent gateway restart [--json]
   skyagent gateway status [--json]
   skyagent gateway logs [--json]
+  skyagent web start [--no-open] [--json]
+  skyagent web stop [--json]
+  skyagent web restart [--no-open] [--json]
+  skyagent web status [--json]
+  skyagent web open [--json]
+  skyagent web logs [--json]
   skyagent memory add <text> [tag ...]
   skyagent memory list
   skyagent memory get <id>
@@ -207,6 +214,12 @@ export async function command(args) {
   if (area === "gateway") {
     const compact = rest.includes("--json");
     print(await gatewayCommand(action, rest.filter((arg) => arg !== "--json")), !compact);
+    return;
+  }
+
+  if (area === "web") {
+    const compact = rest.includes("--json");
+    print(await webCommand(action, rest.filter((arg) => arg !== "--json")), !compact);
     return;
   }
 

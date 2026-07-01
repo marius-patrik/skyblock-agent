@@ -3,6 +3,8 @@
 !.env.example
 node_modules/
 dist/
+!packages/web/dist/
+!packages/web/dist/**
 coverage/
 *.log
 profile-cache/
