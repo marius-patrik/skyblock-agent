@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "skyagent": {
-      "command": "node",
+      "command": "bun",
       "args": [
-        "./scripts/mcp-server.mjs"
+        "./scripts/mcp-server.ts"
       ],
       "env": {
         "HYPIXEL_API_KEY": "${HYPIXEL_API_KEY}"

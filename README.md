@@ -13,9 +13,10 @@ The goal is to connect Codex to live player data, game reference data, and curat
 
 - `skills/` contains durable SkyBlock reasoning rules and source-priority guidance.
 - `.mcp.json` exposes local tools for Hypixel API calls, profile data, public SkyBlock resources, and persistent SkyAgent notes.
-- `scripts/skyagent.mjs` is the CLI.
-- `scripts/mcp-server.mjs` is the MCP server used by Codex.
+- `scripts/skyagent.ts` is the Bun-powered CLI.
+- `scripts/mcp-server.ts` is the Bun-powered MCP server used by Codex.
 - `assets/` is reserved for plugin assets and reference fixtures.
+- Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui.
 
 ## Local Setup
 
@@ -28,8 +29,8 @@ $env:HYPIXEL_API_KEY = "your-key"
 Or store it in the SkyAgent user config:
 
 ```powershell
-node .\scripts\skyagent.mjs config set api-key your-key
-node .\scripts\skyagent.mjs config set username YourMinecraftName
+bun .\scripts\skyagent.ts config set api-key your-key
+bun .\scripts\skyagent.ts config set username YourMinecraftName
 ```
 
 SkyAgent stores config and memories outside the repo:
@@ -40,16 +41,16 @@ SkyAgent stores config and memories outside the repo:
 ## CLI Examples
 
 ```powershell
-node .\scripts\skyagent.mjs config get
-node .\scripts\skyagent.mjs resolve YourMinecraftName
-node .\scripts\skyagent.mjs profiles
-node .\scripts\skyagent.mjs profiles-summary
-node .\scripts\skyagent.mjs overview
-node .\scripts\skyagent.mjs skycrypt YourMinecraftName
-node .\scripts\skyagent.mjs resource items
-node .\scripts\skyagent.mjs bazaar
-node .\scripts\skyagent.mjs firesales
-node .\scripts\skyagent.mjs memory add "Working toward F7 completion" goal dungeon
+bun .\scripts\skyagent.ts config get
+bun .\scripts\skyagent.ts resolve YourMinecraftName
+bun .\scripts\skyagent.ts profiles
+bun .\scripts\skyagent.ts profiles-summary
+bun .\scripts\skyagent.ts overview
+bun .\scripts\skyagent.ts skycrypt YourMinecraftName
+bun .\scripts\skyagent.ts resource items
+bun .\scripts\skyagent.ts bazaar
+bun .\scripts\skyagent.ts firesales
+bun .\scripts\skyagent.ts memory add "Working toward F7 completion" goal dungeon
 ```
 
 ## Data Sources

@@ -4,6 +4,8 @@
 
 This repository builds a Codex plugin, CLI, and MCP server for Hypixel SkyBlock profile analysis.
 
+Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. Defer additional framework, state, styling, deployment, and database choices until the web app requirements are clear.
+
 ## Source Priority
 
 - Prefer official Hypixel API data and official Hypixel docs for endpoint behavior.
@@ -15,17 +17,18 @@ This repository builds a Codex plugin, CLI, and MCP server for Hypixel SkyBlock 
 
 - Do not commit API keys, profile snapshots, cache files, or personal config.
 - Read `HYPIXEL_API_KEY` before any stored config key.
-- Store local config and memories outside the repo through `scripts/lib/store.mjs`.
+- Store local config and memories outside the repo through `scripts/lib/store.ts`.
 - Do not print API key values in CLI or MCP responses.
 - Keep `.env.example` placeholder-only.
 
 ## Architecture
 
-- Keep transport/API code in `scripts/lib/hypixel.mjs`.
-- Keep user config and memory persistence in `scripts/lib/store.mjs`.
-- Keep profile-level extraction and SkyCrypt-style viewer helpers in `scripts/lib/profile.mjs`.
-- Keep CLI command wiring in `scripts/skyagent.mjs`.
-- Keep MCP tool schemas and dispatch in `scripts/mcp-server.mjs`.
+- Prefer TypeScript over JavaScript whenever possible.
+- Keep transport/API code in `scripts/lib/hypixel.ts`.
+- Keep user config and memory persistence in `scripts/lib/store.ts`.
+- Keep profile-level extraction and SkyCrypt-style viewer helpers in `scripts/lib/profile.ts`.
+- Keep CLI command wiring in `scripts/skyagent.ts`.
+- Keep MCP tool schemas and dispatch in `scripts/mcp-server.ts`.
 - Add new parser/calculator modules under `scripts/lib/` before expanding CLI/MCP wiring.
 
 ## API and Tool Design
@@ -64,4 +67,3 @@ codex plugin add skyagent@personal
 - Keep `main` deployable.
 - Commit focused changes with concise messages.
 - Push completed repo-rule, plugin, CLI, MCP, and skill changes to `origin/main`.
-

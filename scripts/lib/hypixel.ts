@@ -1,4 +1,4 @@
-import { getApiKey, readConfig } from "./store.mjs";
+import { getApiKey, readConfig } from "./store.ts";
 
 const HYPIXEL_BASE_URL = "https://api.hypixel.net/v2";
 const MOJANG_PROFILE_URL = "https://api.mojang.com/users/profiles/minecraft";
@@ -65,7 +65,7 @@ export function normalizePath(input) {
   return endpoint;
 }
 
-export async function hypixelRequest(endpoint, query = {}, options = {}) {
+export async function hypixelRequest(endpoint: string, query: Record<string, unknown> = {}, options: { requireKey?: boolean } = {}) {
   const config = readConfig();
   const path = normalizePath(endpoint);
   const url = new URL(`${HYPIXEL_BASE_URL}/${path}`);
@@ -75,7 +75,7 @@ export async function hypixelRequest(endpoint, query = {}, options = {}) {
     }
   }
 
-  const headers = {
+  const headers: Record<string, string> = {
     "User-Agent": "skyagent/0.1.0",
   };
   const apiKey = getApiKey(config);
@@ -137,4 +137,3 @@ export async function configuredProfileId(explicitProfileId) {
   }
   throw new Error("Profile ID is required. Pass one explicitly or run `skyagent config set profile <profileId>`.");
 }
-

@@ -4,10 +4,16 @@
   "description": "Codex plugin, CLI, and MCP tools for Hypixel SkyBlock profile analysis.",
   "type": "module",
   "bin": {
-    "skyagent": "./scripts/skyagent.mjs"
+    "skyagent": "./scripts/skyagent.ts"
   },
   "scripts": {
-    "check": "node --check scripts/skyagent.mjs && node --check scripts/mcp-server.mjs && node --check scripts/lib/hypixel.mjs && node --check scripts/lib/store.mjs && node --check scripts/lib/profile.mjs"
+    "check": "bun run typecheck && bun run smoke",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
 }

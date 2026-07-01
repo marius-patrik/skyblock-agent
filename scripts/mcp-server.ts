@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.mjs";
-import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.mjs";
-import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.mjs";
+import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.ts";
+import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.ts";
+import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.ts";
 
 const tools = [
   {
@@ -256,7 +256,7 @@ function textResult(value) {
   };
 }
 
-async function callTool(name, args = {}) {
+async function callTool(name: string, args: Record<string, any> = {}) {
   switch (name) {
     case "skyagent_config_get":
       return publicConfig();
@@ -407,6 +407,6 @@ function parseMessages() {
 }
 
 process.stdin.on("data", (chunk) => {
-  buffer = Buffer.concat([buffer, chunk]);
+  buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
   parseMessages();
 });

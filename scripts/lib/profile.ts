@@ -1,5 +1,5 @@
-import { readConfig } from "./store.mjs";
-import { skyblockProfiles, uuidFromNameOrUuid } from "./hypixel.mjs";
+import { readConfig } from "./store.ts";
+import { skyblockProfiles, uuidFromNameOrUuid } from "./hypixel.ts";
 
 export function skycryptUrl(usernameOrUuid, profileName) {
   const base = `https://sky.shiiyu.moe/stats/${encodeURIComponent(usernameOrUuid)}`;

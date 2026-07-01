@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.mjs";
-import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.mjs";
-import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.mjs";
+import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.ts";
+import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.ts";
+import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.ts";
 
 function print(value, pretty = true) {
   process.stdout.write(`${JSON.stringify(value, null, pretty ? 2 : 0)}\n`);
@@ -73,7 +73,7 @@ async function command(args) {
       return;
     }
     if (action === "get") {
-      const config = publicConfig();
+      const config: Record<string, unknown> = publicConfig();
       if (rest.includes("--show-key")) {
         config.warning = "API key values are intentionally not printed by this CLI.";
       }
