@@ -72,5 +72,8 @@ codex plugin add skyagent@personal
 - Land each slice to `main` through a PR from the dev branch.
 - The PR must close the corresponding issue on merge.
 - Main should receive one commit per slice. Use a single focused commit on the branch or squash-merge the PR.
+- Add the `automerge` label only when a PR is intended to merge automatically after CI and Codex autoreview pass.
+- Codex autoreview uses the GitHub secret `CODEX_AUTH_JSON`, containing Codex OAuth `auth.json`; do not use `OPENAI_API_KEY` for this repo's Codex CI review.
+- Keep the Codex autoreview runtime bundled in `.github/codex-review.Dockerfile` instead of installing Codex ad hoc in the workflow.
 - Commit focused changes with concise messages.
 - Push completed repo-rule, plugin, CLI, MCP, and skill changes to the dev branch, then open a PR.

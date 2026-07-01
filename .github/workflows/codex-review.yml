@@ -1,0 +1,111 @@
+name: Codex Review
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  codex-review:
+    name: Codex Review
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Codex review image
+        run: docker build -f .github/codex-review.Dockerfile -t skyagent-codex-review .
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: pr-workspace
+
+      - name: Run Codex review
+        id: review
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          if [ -z "${CODEX_AUTH_JSON:-}" ]; then
+            cat > codex-review.json <<'EOF'
+          {
+            "approved": false,
+            "summary": "Codex autoreview could not run because repository secret CODEX_AUTH_JSON is not configured.",
+            "blocking_findings": [
+              "Configure CODEX_AUTH_JSON in GitHub repository secrets to enable automated Codex PR review with Codex OAuth auth."
+            ],
+            "non_blocking_notes": []
+          }
+          EOF
+            exit 0
+          fi
+
+          CODEX_HOME_DIR="${RUNNER_TEMP}/codex-home"
+          mkdir -p "${CODEX_HOME_DIR}"
+          printf '%s' "${CODEX_AUTH_JSON}" > "${CODEX_HOME_DIR}/auth.json"
+          chmod 600 "${CODEX_HOME_DIR}/auth.json"
+
+          docker run --rm \
+            -e CODEX_HOME=/codex-home \
+            -e HOME=/codex-home \
+            -e BASE_REF=origin/main \
+            -e REVIEW_OUTPUT=codex-review.json \
+            -e PR_TITLE \
+            -e PR_BODY \
+            -v "${PWD}/pr-workspace:/workspace" \
+            -v "${CODEX_HOME_DIR}:/codex-home" \
+            skyagent-codex-review
+
+          cp pr-workspace/codex-review.json codex-review.json
+
+      - name: Comment review
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const review = JSON.parse(fs.readFileSync("codex-review.json", "utf8"));
+            const marker = "<!-- skyagent-codex-review -->";
+            const blocking = review.blocking_findings.length
+              ? review.blocking_findings.map((item) => `- ${item}`).join("\n")
+              : "- None";
+            const notes = review.non_blocking_notes.length
+              ? review.non_blocking_notes.map((item) => `- ${item}`).join("\n")
+              : "- None";
+            const verdict = review.approved ? "Approved" : "Changes required";
+            const commentBody = `${marker}\n## Codex Autoreview\n\n**Verdict:** ${verdict}\n\n${review.summary}\n\n### Blocking Findings\n\n${blocking}\n\n### Non-Blocking Notes\n\n${notes}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const existing = comments.data.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: commentBody });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: commentBody });
+            }
+
+      - name: Enforce Codex verdict
+        if: always()
+        shell: bash
+        run: |
+          node -e "const fs = require('fs'); const r = JSON.parse(fs.readFileSync('codex-review.json', 'utf8')); if (!r.approved) { console.error('Codex review did not approve this PR.'); process.exit(1); }"

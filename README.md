@@ -73,3 +73,5 @@ See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper
 ## CI
 
 GitHub Actions runs `bun run ci` on pushes to `main` and pull requests targeting `main`. The CI checks TypeScript, runs the no-key CLI smoke test, and validates the plugin manifest plus the Hypixel SkyBlock skill packaging.
+
+Pull requests also run Codex autoreview in the Docker image defined by `.github/codex-review.Dockerfile` when the repository secret `CODEX_AUTH_JSON` is configured from a Codex OAuth `auth.json` file. The review workflow uses `pull_request_target`, builds the review image from trusted base-branch files, then checks out the PR head with credentials disabled into a separate workspace for read-only review. To allow a PR to merge automatically after CI and Codex review pass, add the `automerge` label and include a closing issue reference such as `Closes #123` in the PR body. Automerge uses squash merge and never uses admin bypass.
