@@ -69,3 +69,7 @@ Source priority should generally be: live API data, official patch notes, offici
 Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; decoding that is intentionally left for a later parser module.
 
 See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools.
+
+## CI
+
+GitHub Actions runs `bun run ci` on pushes to `main` and pull requests targeting `main`. The CI checks TypeScript, runs the no-key CLI smoke test, and validates the plugin manifest plus the Hypixel SkyBlock skill packaging.

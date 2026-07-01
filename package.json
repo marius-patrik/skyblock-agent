@@ -8,8 +8,11 @@
   },
   "scripts": {
     "check": "bun run typecheck && bun run smoke",
+    "ci": "bun run check && bun run validate:plugin && bun run validate:skill",
     "typecheck": "tsc --noEmit",
-    "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple"
+    "smoke": "bun ./scripts/skyagent.ts skycrypt Notch Apple",
+    "validate:plugin": "bun ./scripts/ci/validate-plugin.ts",
+    "validate:skill": "bun ./scripts/ci/validate-skill.ts"
   },
   "license": "MIT",
   "devDependencies": {
