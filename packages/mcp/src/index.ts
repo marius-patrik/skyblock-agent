@@ -247,7 +247,7 @@ const tools = [
   },
   {
     name: "skyblock_profile_section",
-    description: "Render one structured progression section such as skills, dungeons, slayer, collections, or currencies. Requires API key.",
+    description: "Render one structured progression section such as skills, dungeons, slayer, mining, garden, bestiary, collections, minions, museum, crimson_isle, rift, trophy_fishing, pets, essence, currencies, or unlocks. Requires API key.",
     inputSchema: {
       type: "object",
       properties: {
@@ -261,7 +261,7 @@ const tools = [
   },
   {
     name: "skyblock_progression",
-    description: "Render the shared profile progression framework sections with XP calculations, warnings, and provenance. Requires API key.",
+    description: "Render shared SkyCrypt-style profile progression sections with XP calculations, missing-data warnings, formulas, and provenance. Requires API key.",
     inputSchema: {
       type: "object",
       properties: {

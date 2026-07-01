@@ -103,7 +103,7 @@ Networth results combine purse, bank, and sectioned inventory item totals. Items
 
 Accessory results inspect the accessory bag, estimate Magical Power, detect duplicates and recombobulation/enrichment signals, and rank missing-accessory upgrades by coin per Magical Power when accessory metadata and resolved prices are available. Missing-accessory coverage depends on the configured accessory metadata provider and is explicit when the full universe is unavailable.
 
-Progression results provide a shared section framework for skills, Dungeons, Slayer, collections, and currencies. Outputs include source fields used, computed XP levels, warnings, formula provenance, and static table metadata so later section modules can share lookup and formatting logic.
+Progression results provide SkyCrypt-style profile sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Each section reports source fields, computed summaries, warnings for missing API data, and formula/table provenance. Section aliases include `hotm`, `kuudra`, `farming`, `trophy_fish`, and `important_unlocks`.
 
 See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, `docs/parity-spec.md` for the detailed missing-parity implementation spec, and `docs/networth-comparison.md` for networth comparison-smoke notes.
 

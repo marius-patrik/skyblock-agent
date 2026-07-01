@@ -30,6 +30,8 @@ export const CATACOMBS_XP_INCREMENTS = [
 ];
 
 export const SLAYER_XP_THRESHOLDS = [0, 5, 15, 200, 1_000, 5_000, 20_000, 100_000, 400_000, 1_000_000];
+export const HOTM_XP_THRESHOLDS = [0, 3_000, 12_000, 37_000, 97_000, 197_000, 347_000, 557_000, 847_000, 1_247_000];
+export const GARDEN_XP_THRESHOLDS = [0, 70, 140, 280, 520, 1_120, 2_620, 4_620, 7_120, 10_120, 20_120, 30_120, 40_120, 50_120, 60_120];
 
 export const RARITY_ORDER = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC", "DIVINE", "SPECIAL", "VERY SPECIAL"];
 
@@ -71,6 +73,32 @@ export function levelFromXp(xp: unknown, thresholds: number[]) {
   };
 }
 
+export function levelFromXpWithBase(xp: unknown, thresholds: number[], baseLevel: number) {
+  const value = Math.max(0, Number(xp) || 0);
+  let index = 0;
+  for (let cursor = 0; cursor < thresholds.length; cursor += 1) {
+    if (value >= thresholds[cursor]) {
+      index = cursor;
+    } else {
+      break;
+    }
+  }
+  const current = thresholds[index] ?? 0;
+  const next = thresholds[index + 1] ?? null;
+  const intoLevel = value - current;
+  const needed = next === null ? 0 : next - current;
+  return {
+    xp: value,
+    level: baseLevel + index,
+    maxLevel: baseLevel + thresholds.length - 1,
+    currentLevelXp: current,
+    nextLevelXp: next,
+    xpIntoLevel: intoLevel,
+    xpForNextLevel: needed,
+    progressToNext: next === null || needed <= 0 ? 1 : Math.max(0, Math.min(1, intoLevel / needed)),
+  };
+}
+
 export function skillLevelFromXp(xp: unknown) {
   return levelFromXp(xp, SKILL_XP_THRESHOLDS);
 }
@@ -81,6 +109,14 @@ export function catacombsLevelFromXp(xp: unknown) {
 
 export function slayerLevelFromXp(xp: unknown) {
   return levelFromXp(xp, SLAYER_XP_THRESHOLDS);
+}
+
+export function hotmLevelFromXp(xp: unknown) {
+  return levelFromXpWithBase(xp, HOTM_XP_THRESHOLDS, 1);
+}
+
+export function gardenLevelFromXp(xp: unknown) {
+  return levelFromXpWithBase(xp, GARDEN_XP_THRESHOLDS, 1);
 }
 
 export function normalizeSectionName(value: unknown) {
