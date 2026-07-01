@@ -42,6 +42,8 @@ jobs:
         id: review
         env:
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          CODEX_REVIEW_MODEL: gpt-5.5
+          CODEX_REVIEW_EFFORT: low
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         shell: bash
@@ -70,6 +72,8 @@ jobs:
             -e HOME=/codex-home \
             -e BASE_REF=origin/main \
             -e REVIEW_OUTPUT=codex-review.json \
+            -e CODEX_REVIEW_MODEL \
+            -e CODEX_REVIEW_EFFORT \
             -e PR_TITLE \
             -e PR_BODY \
             -v "${PWD}/pr-workspace:/workspace" \

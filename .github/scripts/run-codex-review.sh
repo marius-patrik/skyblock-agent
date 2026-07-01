@@ -7,6 +7,8 @@ CODEX_HOME="${CODEX_HOME:-/tmp/codex-home}"
 SCHEMA_PATH="${SCHEMA_PATH:-/opt/codex-review/schema.json}"
 PR_TITLE="${PR_TITLE:-}"
 PR_BODY="${PR_BODY:-}"
+CODEX_REVIEW_MODEL="${CODEX_REVIEW_MODEL:-gpt-5.5}"
+CODEX_REVIEW_EFFORT="${CODEX_REVIEW_EFFORT:-low}"
 
 write_blocked_review() {
   local summary="$1"
@@ -63,6 +65,8 @@ EOF
 
 if ! codex exec \
   --cd /workspace \
+  --model "${CODEX_REVIEW_MODEL}" \
+  --reasoning-effort "${CODEX_REVIEW_EFFORT}" \
   --sandbox read-only \
   --ephemeral \
   --output-schema "${SCHEMA_PATH}" \
