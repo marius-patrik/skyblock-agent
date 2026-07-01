@@ -66,7 +66,7 @@ EOF
 if ! codex exec \
   --cd /workspace \
   --model "${CODEX_REVIEW_MODEL}" \
-  --reasoning-effort "${CODEX_REVIEW_EFFORT}" \
+  -c "model_reasoning_effort=\"${CODEX_REVIEW_EFFORT}\"" \
   --sandbox read-only \
   --ephemeral \
   --output-schema "${SCHEMA_PATH}" \
