@@ -19,6 +19,27 @@ export type ItemMetadataResult = {
 
 const metadataCache = new Map<string, ItemMetadataResult>();
 
+export function clearMetadataCache() {
+  metadataCache.clear();
+}
+
+export function metadataCacheStatus() {
+  const entries = [...metadataCache.entries()].map(([internalId, result]) => ({
+    internalId,
+    source: result.provider.source,
+    url: result.provider.url ?? null,
+    version: result.provider.version ?? null,
+    fetchedAt: result.provider.fetchedAt,
+    cacheStatus: result.provider.cacheStatus,
+    warnings: result.warnings,
+  }));
+  return {
+    entries,
+    entryCount: entries.length,
+    unavailableCount: entries.filter((entry) => entry.cacheStatus === "unavailable").length,
+  };
+}
+
 export function cleanMinecraftText(value: unknown) {
   return String(value ?? "")
     .replace(/§[0-9A-FK-OR]/gi, "")

@@ -8,6 +8,7 @@ export * from "./planner.ts";
 export * from "./prices.ts";
 export * from "./progression.ts";
 export * from "./profile.ts";
+export * from "./providers.ts";
 export * from "./readiness.ts";
 export * from "./sections/index.ts";
 export * from "./setup.ts";

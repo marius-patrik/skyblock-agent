@@ -6,6 +6,7 @@ const DEFAULT_HYPIXEL_AUCTION_SCAN_PAGES = 3;
 
 type CacheEntry = {
   expiresAt: number;
+  storedAt: number;
   value: any;
 };
 
@@ -35,7 +36,24 @@ function cacheGet(key: string) {
 }
 
 function cacheSet(key: string, value: any, ttlMs: number) {
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  const storedAt = Date.now();
+  cache.set(key, { value, storedAt, expiresAt: storedAt + ttlMs });
+}
+
+export function priceCacheStatus(now = Date.now()) {
+  const entries = [...cache.entries()].map(([key, entry]) => ({
+    key,
+    storedAt: new Date(entry.storedAt).toISOString(),
+    expiresAt: new Date(entry.expiresAt).toISOString(),
+    ttlMs: Math.max(0, entry.expiresAt - now),
+    ageMs: Math.max(0, now - entry.storedAt),
+    stale: now > entry.expiresAt,
+  }));
+  return {
+    entries,
+    entryCount: entries.length,
+    staleCount: entries.filter((entry) => entry.stale).length,
+  };
 }
 
 function transportCacheKey(transport: Function | undefined) {

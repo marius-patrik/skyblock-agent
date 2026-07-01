@@ -143,6 +143,99 @@ test("profiles and overview routes use injected core contracts", async () => {
   expect(overview.overview.selectedProfile.profileId).toBe("profile-1");
 });
 
+test("analysis routes mirror core contracts and preserve warnings", async () => {
+  const warnings = ["inventory_api_disabled"];
+  const gateway = createGateway({
+    token: "test-token",
+    deps: ({
+      inventoryForPlayer: async (player, profile) => ({ player, profile, warnings, sections: [] }),
+      inventorySectionForPlayer: async (section, player, profile) => ({ section, player, profile, warnings, items: [] }),
+      normalizedItemsForPlayer: async () => ({ items: [{ id: "ASPECT_OF_THE_END" }], warnings }),
+      itemMetadata: async (id) => ({ id, name: "Aspect of the End", warnings }),
+      networthForPlayer: async () => ({ total: 12, warnings }),
+      itemNetworthForPlayer: async (_player, _profile, section) => ({ section, total: 3, warnings }),
+      accessoriesForPlayer: async () => ({ magicalPower: 10, warnings }),
+      missingAccessoriesForPlayer: async () => ({ missing: [], warnings }),
+      accessoryUpgradesForPlayer: async (_player, _profile, budget) => ({ budget, upgrades: [], warnings }),
+      profileSectionForPlayer: async (name) => ({ name, warnings }),
+      progressionForPlayer: async () => ({ skills: [], warnings }),
+      readinessForPlayer: async (area) => ({ area, status: "unknown", warnings }),
+      weightForPlayer: async () => ({ estimate: null, warnings }),
+      planGoalForPlayer: async (goal, _player, _profile, options) => ({ goal, budget: options.budget, warnings }),
+      nextUpgradesForPlayer: async (_player, _profile, budget) => ({ budget, warnings }),
+      hypixelRequest: async (endpoint) => ({ endpoint, body: { ok: true }, warnings }),
+      resourceEndpoint: (kind) => `resources/skyblock/${kind}`,
+      providerStatus: () => ({
+        generatedAt: "2026-07-01T00:00:00.000Z",
+        providers: [{ id: "pricing", cache: { entryCount: 1, staleCount: 0 }, warnings }],
+        resources: [{ kind: "items", endpoint: "resources/skyblock/items" }],
+        warnings,
+      }),
+    }) as any,
+  });
+
+  const inventory = await gateway.handle(request("/inventory?player=Notch&profile=Apple", "test-token")).then((response) => response.json());
+  expect(inventory.inventory.warnings).toEqual(warnings);
+
+  const section = await gateway.handle(request("/inventory-section?section=armor", "test-token")).then((response) => response.json());
+  expect(section.inventorySection.section).toBe("armor");
+
+  const metadata = await gateway.handle(request("/items/metadata?id=ASPECT_OF_THE_END", "test-token")).then((response) => response.json());
+  expect(metadata.item.name).toBe("Aspect of the End");
+
+  const networth = await gateway.handle(request("/item-networth?section=armor", "test-token")).then((response) => response.json());
+  expect(networth.itemNetworth.total).toBe(3);
+
+  const upgrades = await gateway.handle(request("/accessories/upgrades?budget=1000", "test-token")).then((response) => response.json());
+  expect(upgrades.upgrades.budget).toBe(1000);
+
+  const plan = await gateway.handle(request("/plan?goal=f7&budget=2000", "test-token")).then((response) => response.json());
+  expect(plan.plan).toMatchObject({ goal: "f7", budget: 2000, warnings });
+
+  const resource = await gateway.handle(request("/resource?kind=items", "test-token")).then((response) => response.json());
+  expect(resource.resource.endpoint).toBe("resources/skyblock/items");
+  const providerStatus = await gateway.handle(request("/provider-status", "test-token")).then((response) => response.json());
+  expect(providerStatus.providers.providers[0].cache.entryCount).toBe(1);
+  const invalidResource = await gateway.handle(request("/resource?kind=../player", "test-token"));
+  expect(invalidResource.status).toBe(400);
+
+  const invalid = await gateway.handle(request("/next-upgrades", "test-token"));
+  expect(invalid.status).toBe(400);
+  const emptyBudget = await gateway.handle(request("/accessories/upgrades?budget=", "test-token"));
+  expect(emptyBudget.status).toBe(400);
+});
+
+test("gateway client exposes analysis route helpers", async () => {
+  const client = new GatewayClient({ baseUrl: "http://127.0.0.1", token: "test-token" }) as any;
+  const paths: string[] = [];
+  client.request = async (route: string) => {
+    paths.push(route);
+    return { route };
+  };
+
+  await client.inventorySection("armor", "Notch", "Apple");
+  await client.normalizedItems("Notch", "Apple");
+  await client.itemMetadata("ASPECT_OF_THE_END");
+  await client.networth("Notch", "Apple");
+  await client.itemNetworth("armor", "Notch", "Apple");
+  await client.accessories("Notch", "Apple");
+  await client.missingAccessories("Notch", "Apple");
+  await client.accessoryUpgrades(1000, "Notch", "Apple");
+  await client.section("skills", "Notch", "Apple");
+  await client.progression("Notch", "Apple");
+  await client.readiness("dungeons", "Notch", "Apple");
+  await client.weight("Notch", "Apple");
+  await client.plan("f7", "Notch", "Apple", 2000);
+  await client.nextUpgrades(3000, "Notch", "Apple");
+  await client.providerStatus();
+  await client.resource("items");
+
+  expect(paths).toContain("/inventory-section?section=armor&player=Notch&profile=Apple");
+  expect(paths).toContain("/items/metadata?id=ASPECT_OF_THE_END");
+  expect(paths).toContain("/provider-status");
+  expect(paths).toContain("/resource?kind=items");
+});
+
 test("started gateway serves client requests on localhost", async () => {
   const service = startGateway({ token: "test-token", port: 0, version: "1.2.3" });
   try {
