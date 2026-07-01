@@ -85,4 +85,19 @@ for (const expected of [
   }
 }
 
+const profileSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-profile-api", "SKILL.md"), "utf8");
+for (const expected of [
+  "hypixel_status",
+  "api_disabled",
+  "missing_profile",
+  "missing_member",
+  "online/status checks",
+  "rate-limit",
+  "HYPIXEL_API_KEY",
+]) {
+  if (!profileSkill.includes(expected)) {
+    fail(`skyagent-profile-api must mention ${expected}`);
+  }
+}
+
 console.log(`Skill validation passed (${folders.length} skills)`);
