@@ -12,6 +12,7 @@ import { compactProfileOverview, fetchProfileContext, profileSummaries, skycrypt
 import { readinessForPlayer } from "@skyagent/core/readiness";
 import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/sections";
 import { weightForPlayer } from "@skyagent/core/weight";
+import { gatewayCommand } from "./gateway.ts";
 
 function print(value, pretty = true) {
   process.stdout.write(`${JSON.stringify(value, null, pretty ? 2 : 0)}\n`);
@@ -66,6 +67,11 @@ Usage:
   skyagent firesales
   skyagent news
   skyagent request <v2/path> [key=value ...]
+  skyagent gateway start [--json]
+  skyagent gateway stop [--json]
+  skyagent gateway restart [--json]
+  skyagent gateway status [--json]
+  skyagent gateway logs [--json]
   skyagent memory add <text> [tag ...]
   skyagent memory list
   skyagent memory get <id>
@@ -196,6 +202,12 @@ export async function command(args) {
       print(setConfigValue(keyMap[key], value));
       return;
     }
+  }
+
+  if (area === "gateway") {
+    const compact = rest.includes("--json");
+    print(await gatewayCommand(action, rest.filter((arg) => arg !== "--json")), !compact);
+    return;
   }
 
   if (area === "memory") {

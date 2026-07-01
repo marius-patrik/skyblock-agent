@@ -24,7 +24,7 @@ test("health is public and version requires gateway token", async () => {
   expect(unauthorized.status).toBe(401);
 
   const version = await gateway.handle(request("/version", "test-token")).then((response) => response.json());
-  expect(version).toEqual({ ok: true, version: "1.2.3" });
+  expect(version).toEqual({ ok: true, version: "1.2.3", pid: process.pid });
 });
 
 test("config routes redact secrets and reject unknown keys", async () => {
@@ -148,10 +148,18 @@ test("started gateway serves client requests on localhost", async () => {
   try {
     const client = new GatewayClient({ baseUrl: service.status.url, token: "test-token" });
     expect(await client.health()).toEqual({ ok: true, service: "skyagent-gateway" });
-    expect(await client.version()).toEqual({ ok: true, version: "1.2.3" });
+    expect(await client.version()).toEqual({ ok: true, version: "1.2.3", pid: process.pid });
+    await expect(client.shutdown()).rejects.toThrow("Unknown gateway route: /shutdown");
   } finally {
     service.stop();
   }
+});
+
+test("started gateway shuts down through authenticated local endpoint when explicitly enabled", async () => {
+  const service = startGateway({ token: "test-token", port: 0, version: "1.2.3", allowShutdown: true });
+  const client = new GatewayClient({ baseUrl: service.status.url, token: "test-token" });
+
+  expect(await client.shutdown()).toEqual({ ok: true, shuttingDown: true });
 });
 
 test("gateway bin requires explicit token for standalone starts", async () => {

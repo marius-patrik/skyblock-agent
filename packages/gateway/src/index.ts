@@ -20,6 +20,7 @@ export type GatewayOptions = {
 export type StartGatewayOptions = GatewayOptions & {
   host?: string;
   port?: number;
+  allowShutdown?: boolean;
 };
 
 const defaultDeps: GatewayDeps = {
@@ -88,7 +89,7 @@ export function createGateway(options: GatewayOptions = {}) {
       }
 
       if (url.pathname === "/version") {
-        return json({ ok: true, version });
+        return json({ ok: true, version, pid: process.pid });
       }
 
       if (url.pathname === "/config" && request.method === "GET") {
@@ -145,10 +146,21 @@ export function createGateway(options: GatewayOptions = {}) {
 export function startGateway(options: StartGatewayOptions = {}) {
   const gateway = createGateway(options);
   const host = options.host ?? "127.0.0.1";
-  const server = Bun.serve({
+  let server: ReturnType<typeof Bun.serve>;
+  server = Bun.serve({
     hostname: host,
     port: options.port ?? 0,
-    fetch: gateway.handle,
+    fetch: async (request) => {
+      const url = new URL(request.url);
+      if (options.allowShutdown && url.pathname === "/shutdown" && request.method === "POST") {
+        if (!isAuthorized(request, gateway.token)) {
+          return errorResponse(401, "unauthorized", "Missing or invalid gateway token.");
+        }
+        setTimeout(() => server.stop(true), 0);
+        return json({ ok: true, shuttingDown: true });
+      }
+      return gateway.handle(request);
+    },
   });
 
   return {
@@ -225,5 +237,9 @@ export class GatewayClient {
     }
     const suffix = params.size ? `?${params}` : "";
     return this.request(`/overview${suffix}`);
+  }
+
+  shutdown() {
+    return this.request("/shutdown", { method: "POST" });
   }
 }

@@ -2,8 +2,12 @@
   "name": "@skyagent/gateway",
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "skyagent-gateway": "./src/bin.ts"
+  },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./bin": "./src/bin.ts"
   },
   "scripts": {
     "start": "bun ./src/bin.ts"
