@@ -28,8 +28,8 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 
 - Use `$skyagent-profile-api` for player resolution, profile selection, overview, member payloads, museum, garden, bingo, or raw Hypixel endpoints.
 - Use `$skyagent-inventory-items` for inventory sections, armor, equipment, wardrobe, backpacks, accessory bag item dumps, normalized item records, NBT state, item metadata, or modifier reasoning.
-- Use `$skyagent-economy` for prices, Bazaar, auctions, LBIN, price history, networth, provider confidence, or market uncertainty.
-- Use `$skyagent-accessories` for Magical Power, accessory bag state, missing accessories, duplicates, enrichment, recombobulation, or budgeted MP upgrades.
+- Use `$skyagent-economy` for coin value, prices, Bazaar, auctions, LBIN, price history, networth, item networth, provider freshness, stale-cache behavior, third-party uncertainty, or market volatility.
+- Use `$skyagent-accessories` for Magical Power, accessory bag state, missing accessories, duplicates, enrichment, recombobulation, budget-constrained coin-per-MP upgrades, or accessory price uncertainty.
 - Use `$skyagent-progression` for profile sections, XP curves, skills, Dungeons, Slayer, Mining/HotM, Garden, weight, or readiness.
 - Use `$skyagent-planning` for goal plans, next upgrades, blockers, daily/weekly routes, and what to skip.
 - Use `$skyagent-provider-maintenance` for patch-sensitive metas, provider freshness, stale formulas, parity assumptions, or official-source verification.

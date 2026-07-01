@@ -118,4 +118,43 @@ for (const expected of [
   }
 }
 
+const economySkill = fs.readFileSync(path.join(skillsRoot, "skyagent-economy", "SKILL.md"), "utf8");
+for (const expected of [
+  "skyblock_price",
+  "skyblock_lowest_bin",
+  "skyblock_price_history",
+  "skyblock_networth",
+  "skyblock_item_networth",
+  "provider freshness",
+  "stale-cache",
+  "third-party uncertainty",
+  "market volatility",
+  "Do not invent prices",
+  "Do not add unknown prices into networth totals",
+]) {
+  if (!economySkill.includes(expected)) {
+    fail(`skyagent-economy must mention ${expected}`);
+  }
+}
+
+const accessoriesSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-accessories", "SKILL.md"), "utf8");
+for (const expected of [
+  "skyblock_accessories",
+  "skyblock_missing_accessories",
+  "skyblock_accessory_upgrades",
+  "skyblock_networth",
+  "skyblock_item_networth",
+  "full sectioned networth",
+  "Magical Power",
+  "budget-constrained coin-per-MP",
+  "missing-price",
+  "over-budget",
+  "provider confidence",
+  "stale-cache warnings",
+]) {
+  if (!accessoriesSkill.includes(expected)) {
+    fail(`skyagent-accessories must mention ${expected}`);
+  }
+}
+
 console.log(`Skill validation passed (${folders.length} skills)`);
