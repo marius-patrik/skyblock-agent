@@ -1,5 +1,23 @@
-import { describe, expect, test } from "bun:test";
-import { CATACOMBS_XP_THRESHOLDS, GARDEN_XP_THRESHOLDS, HOTM_XP_THRESHOLDS, SKILL_XP_THRESHOLDS, nextUpgradesFromContext, planGoalFromContext } from "../src/index.ts";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, test } from "bun:test";
+import { CATACOMBS_XP_THRESHOLDS, GARDEN_XP_THRESHOLDS, HOTM_XP_THRESHOLDS, SKILL_XP_THRESHOLDS, createObjectiveItem, listObjectiveItems, nextUpgradesFromContext, planGoalFromContext } from "../src/index.ts";
+
+let tempHome: string | null = null;
+
+afterEach(() => {
+  if (tempHome) {
+    fs.rmSync(tempHome, { recursive: true, force: true });
+    tempHome = null;
+  }
+  delete process.env.SKYAGENT_HOME;
+});
+
+function isolatedSkyAgentHome() {
+  tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-planner-test-"));
+  process.env.SKYAGENT_HOME = tempHome;
+}
 
 function context(overrides: any = {}) {
   return {
@@ -106,6 +124,70 @@ describe("planner", () => {
     expect(first.recommendations.some((entry) => entry.id === "goal-route")).toBe(true);
     expect(first.recommendations.some((entry) => entry.id === "dungeons-catacombs_24")).toBe(true);
     expect(first.whatToSkip[0]).toMatchObject({ id: "skip-low-impact-detours" });
+    expect(first.skipGuidance[0]).toMatchObject({ id: "skip-low-impact-detours" });
+    expect(first.immediateActions[0]).toMatchObject({ kind: "task", recommendationId: "accessory-CHEAP_TALISMAN" });
+    expect(first.todoCandidates.some((entry) => entry.kind === "task")).toBe(true);
+    expect(first.buyListCandidates[0]).toMatchObject({ kind: "buy", itemId: "CHEAP_TALISMAN", targetPrice: 800_000 });
+    expect(first.snipeTargets[0]).toMatchObject({ kind: "snipe", itemId: "CHEAP_TALISMAN" });
+  });
+
+  test("persists plan candidates as objective work items only when requested", async () => {
+    isolatedSkyAgentHome();
+    const preview = await planGoalFromContext(context(), "f7 dungeons", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([upgrade]),
+      memories: [],
+      config: {},
+    });
+
+    expect(preview.persistedObjectives).toBeNull();
+    expect(listObjectiveItems().items).toEqual([]);
+
+    const persisted = await planGoalFromContext(context(), "f7 dungeons", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([upgrade]),
+      memories: [],
+      config: {},
+      persistObjectives: true,
+      maxPersistedTasks: 1,
+      maxPersistedBuys: 1,
+      maxPersistedSnipes: 1,
+    });
+    const items = listObjectiveItems().items;
+
+    expect(persisted.persistedObjectives).toMatchObject({ count: 4 });
+    expect(items.map((item) => item.itemKind).sort()).toEqual(["buy", "objective", "snipe", "task"]);
+    expect(items.find((item) => item.itemKind === "buy")).toMatchObject({
+      itemId: "CHEAP_TALISMAN",
+      targetPrice: 800_000,
+      budget: 1_000_000,
+      sourceProvider: "test-price",
+    });
+  });
+
+  test("updates an existing objective root when requested", async () => {
+    isolatedSkyAgentHome();
+    const root = createObjectiveItem({ itemKind: "objective", title: "Old F7", status: "open" });
+
+    const result = await planGoalFromContext(context(), "f7 dungeons", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([upgrade]),
+      memories: [],
+      config: {},
+      persistObjectives: true,
+      objectiveId: root.id,
+      objectiveTitle: "Updated F7",
+      maxPersistedTasks: 0,
+      maxPersistedBuys: 0,
+      maxPersistedSources: 0,
+      maxPersistedSnipes: 0,
+    });
+
+    expect(result.persistedObjectives.root).toMatchObject({ id: root.id, title: "Updated F7", status: "active" });
+    expect(listObjectiveItems().items).toContainEqual(expect.objectContaining({ id: root.id, title: "Updated F7" }));
   });
 
   test("next-upgrades enforces budget validation and ranks upgrade recommendations", async () => {
@@ -132,6 +214,31 @@ describe("planner", () => {
     expect(result.inputs.readiness[0]).toMatchObject({ area: "mining", rating: "unknown" });
     expect(result.warnings.some((entry) => entry.code === "missing_api_data")).toBe(true);
     expect(result.warnings.some((entry) => entry.code === "networth_missing")).toBe(true);
+  });
+
+  test("carries stale context and price freshness into plan candidates", async () => {
+    const result = await planGoalFromContext(context(), "accessories", {
+      budget: 1_000_000,
+      contextCapsule: {
+        generatedAt: "2026-07-01T00:00:00.000Z",
+        cache: { status: "hit", stale: true, sourceProvider: "profile-snapshot-cache" },
+        objectives: { counts: { buy: 1 } },
+        warnings: [{ code: "snapshot_only_context", message: "Stale context" }],
+      },
+      networthProvider: () => ({ total: 10, confidence: "low", providerFreshness: [], warnings: [] }),
+      accessoriesProvider: () => accessories([{
+        ...upgrade,
+        provider: { source: "stale-price", cacheStatus: "stale", fetchedAt: "2026-07-01T00:00:00.000Z" },
+        warnings: [{ code: "stale_cache", message: "Using stale price" }],
+      }]),
+      memories: [],
+      config: {},
+    });
+
+    expect(result.inputs.contextCapsule).toMatchObject({ cache: { stale: true }, objectiveCounts: { buy: 1 } });
+    expect(result.sourceFreshness.profile).toMatchObject({ status: "hit", stale: true });
+    expect(result.buyListCandidates[0].freshness).toMatchObject({ source: "stale-price", warnings: [{ code: "stale_cache", message: "Using stale price", sourcePath: null }] });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "snapshot_only_context" }));
   });
 
   test("consumes partial bounded valuation without dropping recommendations", async () => {

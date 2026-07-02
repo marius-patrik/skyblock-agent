@@ -94,6 +94,9 @@ test("valuation-heavy MCP tools expose bounded agent controls", () => {
     timeoutMs: { type: "number" },
   });
   expect(schemaFor("skyblock_plan_goal")).toMatchObject({
+    useContext: { type: "boolean" },
+    persistObjectives: { type: "boolean" },
+    objectiveId: { type: "string" },
     maxItems: { type: "number" },
     networthTimeoutMs: { type: "number" },
     maxPriceLookups: { type: "number" },
@@ -103,6 +106,14 @@ test("valuation-heavy MCP tools expose bounded agent controls", () => {
     maxPriceLookups: { type: "number" },
     accessoryTimeoutMs: { type: "number" },
   });
+});
+
+test("planning MCP tool persists objectives only when explicitly requested", async () => {
+  isolatedSkyAgentHome();
+
+  await expect(callTool("skyblock_plan_goal", { goal: "f7", player: uuid, profile: "Apple" }))
+    .rejects.toThrow();
+  expect(await callTool("skyagent_objective_list", {})).toMatchObject({ count: 0 });
 });
 
 test("context get defaults to cached snapshot reads", async () => {

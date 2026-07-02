@@ -118,6 +118,8 @@ Provider status reads emit `provider.cache_status` and `provider.cache_status_ch
 
 Durable agent work items live in `objectives.json` under SkyAgent home. A normalized item model covers objectives, tasks/todos, buy-list entries, source-list entries, and snipe targets with stable IDs, status transitions, item IDs, target prices, budgets, priority, source provider, freshness, and warnings. CLI and MCP surfaces expose create/list/update/complete/delete operations, and context capsules include a compact live objective summary even when profile data is loaded from cache.
 
+Planner output separates recommendations into immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, and skip guidance. Planning can read cached context/objective summaries when requested, and it creates or updates objective records only behind explicit persistence flags.
+
 Minecraft mod telemetry is reserved as a future producer through provenance metadata only. Expected future fields include `modId`, `minecraftVersion`, `sessionId`, `world`, `location`, `inventoryDelta`, and `objectiveProgress`; this repo slice does not implement the Fabric mod.
 
 ## TUI And Web

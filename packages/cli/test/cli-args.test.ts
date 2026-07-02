@@ -100,6 +100,9 @@ describe("CLI argument parsing", () => {
       goal: "f7",
       budget: 1_000_000,
       values: ["Notch", "Apple"],
+      useContext: false,
+      persistObjectives: false,
+      objectiveId: null,
       maxItems: 150,
       networthTimeoutMs: 8_000,
       maxPriceLookups: 75,
@@ -109,6 +112,9 @@ describe("CLI argument parsing", () => {
       goal: "garden",
       budget: null,
       values: [],
+      useContext: false,
+      persistObjectives: false,
+      objectiveId: null,
       maxItems: 150,
       networthTimeoutMs: 8_000,
       maxPriceLookups: 75,
@@ -118,10 +124,20 @@ describe("CLI argument parsing", () => {
       goal: "f7",
       budget: 1_000_000,
       values: ["Notch"],
+      useContext: false,
+      persistObjectives: false,
+      objectiveId: null,
       maxItems: 50,
       networthTimeoutMs: 1000,
       maxPriceLookups: 25,
       accessoryTimeoutMs: 1500,
+    });
+    expect(parsePlanArgs(["f7", "Notch", "--use-context", "--persist-objectives", "--objective", "objective_1"])).toMatchObject({
+      goal: "f7",
+      values: ["Notch"],
+      useContext: true,
+      persistObjectives: true,
+      objectiveId: "objective_1",
     });
   });
 

@@ -1,5 +1,7 @@
 import { calculateAccessoriesFromMember } from "./accessories.ts";
+import { agentContextForPlayer } from "./agent-context.ts";
 import { networthForContext } from "./networth.ts";
+import { createObjectiveItem, objectiveContextSummary, updateObjectiveItem } from "./objectives.ts";
 import { fetchProfileContext } from "./profile.ts";
 import { readinessFromContext, READINESS_AREAS } from "./readiness.ts";
 import { progressionFromContext } from "./sections/index.ts";
@@ -213,6 +215,134 @@ function sortRecommendations(items: any[]) {
   return [...items].sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
 }
 
+function warningSummary(warnings: any[] = [], limit = 25) {
+  return warnings.slice(0, limit).map((warning) => ({
+    code: warning.code ?? "warning",
+    message: warning.message ?? String(warning.code ?? warning),
+    sourcePath: warning.sourcePath ?? warning.source ?? null,
+  }));
+}
+
+function objectiveFreshnessFromRecommendation(entry: any) {
+  const source = entry.sourceFreshness?.provider?.source ?? entry.sourceFreshness?.source ?? entry.sourceFreshness?.status ?? "planner";
+  const fetchedAt = entry.sourceFreshness?.provider?.fetchedAt ?? entry.sourceFreshness?.fetchedAt ?? null;
+  return {
+    status: entry.sourceFreshness?.status ?? "planned",
+    source,
+    fetchedAt,
+    warnings: warningSummary(entry.warnings ?? [], 10),
+  };
+}
+
+function planCandidate(kind: string, entry: any, extra: Record<string, any> = {}) {
+  return {
+    kind,
+    recommendationId: entry.id,
+    title: entry.title,
+    priority: entry.priority,
+    reason: entry.reason,
+    itemId: extra.itemId ?? null,
+    targetPrice: extra.targetPrice ?? null,
+    budget: extra.budget ?? null,
+    sourceProvider: extra.sourceProvider ?? null,
+    freshness: objectiveFreshnessFromRecommendation(entry),
+    payload: {
+      category: entry.category,
+      expectedImpact: entry.expectedImpact,
+      costEstimate: entry.costEstimate,
+      timeEstimate: entry.timeEstimate,
+      prerequisites: entry.prerequisites,
+      uncertainty: entry.uncertainty,
+      ...extra.payload,
+    },
+  };
+}
+
+function planWorkItems(recommendations: any[], budget: number | null) {
+  const immediateActions = recommendations
+    .filter((entry) => entry.category !== "what_to_skip")
+    .slice(0, 5)
+    .map((entry) => planCandidate("task", entry));
+  const todoCandidates = recommendations
+    .filter((entry) => entry.category === "readiness" || entry.category === "route" || entry.category === "memory_context")
+    .map((entry) => planCandidate("task", entry));
+  const buyListCandidates = recommendations
+    .filter((entry) => entry.category === "upgrade" && entry.costEstimate?.coins !== null)
+    .map((entry) => planCandidate("buy", entry, {
+      itemId: entry.id.replace(/^accessory-/, ""),
+      targetPrice: entry.costEstimate?.coins ?? null,
+      budget,
+      sourceProvider: entry.sourceFreshness?.provider?.source ?? null,
+    }));
+  const sourceItemCandidates = recommendations
+    .filter((entry) => entry.category === "upgrade" && entry.costEstimate?.coins === null)
+    .map((entry) => planCandidate("source", entry, {
+      itemId: entry.id.replace(/^accessory-/, ""),
+      budget,
+      sourceProvider: entry.sourceFreshness?.provider?.source ?? null,
+    }));
+  const snipeCandidates = buyListCandidates
+    .filter((entry) => entry.targetPrice !== null)
+    .map((entry) => ({ ...entry, kind: "snipe", title: `Watch ${entry.title.replace(/^Buy\s+/i, "")}` }));
+
+  return {
+    immediateActions,
+    todoCandidates,
+    buyListCandidates,
+    sourceItemCandidates,
+    snipeCandidates,
+  };
+}
+
+function persistPlanObjectives(goal: string, workItems: any, options: Record<string, any>) {
+  const now = options.now;
+  const root = options.objectiveId
+    ? updateObjectiveItem(options.objectiveId, {
+      title: options.objectiveTitle ?? `Goal: ${goal}`,
+      status: options.objectiveStatus ?? "active",
+      notes: options.objectiveNotes,
+      now,
+    })
+    : createObjectiveItem({
+      itemKind: "objective",
+      title: options.objectiveTitle ?? `Goal: ${goal}`,
+      status: options.objectiveStatus ?? "active",
+      priority: 100,
+      tags: ["planner", "goal"],
+      freshness: { status: "planned", source: "skyagent-planner" },
+      payload: { goal },
+      now,
+    });
+  const selected = [
+    ...workItems.todoCandidates.slice(0, options.maxPersistedTasks ?? 5),
+    ...workItems.buyListCandidates.slice(0, options.maxPersistedBuys ?? 5),
+    ...workItems.sourceItemCandidates.slice(0, options.maxPersistedSources ?? 5),
+    ...workItems.snipeCandidates.slice(0, options.maxPersistedSnipes ?? 3),
+  ];
+  const items = selected.map((candidate: any) => createObjectiveItem({
+    itemKind: candidate.kind,
+    title: candidate.title,
+    status: "open",
+    objectiveId: root.id,
+    notes: candidate.reason,
+    priority: candidate.priority,
+    itemId: candidate.itemId,
+    targetPrice: candidate.targetPrice,
+    budget: candidate.budget,
+    sourceProvider: candidate.sourceProvider,
+    freshness: candidate.freshness,
+    payload: candidate.payload,
+    tags: ["planner", goal],
+    now,
+  }));
+
+  return {
+    root,
+    items,
+    count: items.length + 1,
+  };
+}
+
 export async function planGoalFromContext(context: any, goal: string, options: {
   budget?: number | null;
   memories?: any[];
@@ -220,6 +350,19 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   networthProvider?: (context: any) => Promise<any> | any;
   accessoriesProvider?: (member: any, budget: number | null) => Promise<any> | any;
   progressionProvider?: (context: any) => Promise<any> | any;
+  contextCapsule?: any;
+  contextWarnings?: any[];
+  objectives?: any;
+  persistObjectives?: boolean;
+  objectiveId?: string;
+  objectiveTitle?: string;
+  objectiveStatus?: string;
+  objectiveNotes?: string;
+  maxPersistedTasks?: number;
+  maxPersistedBuys?: number;
+  maxPersistedSources?: number;
+  maxPersistedSnipes?: number;
+  now?: number;
   maxItems?: number;
   networthTimeoutMs?: number;
   maxPriceLookups?: number;
@@ -244,12 +387,16 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   })))(context.member, budget);
   const memories = options.memories ?? readMemories();
   const config = options.config ?? publicConfig();
+  const contextCapsule = options.contextCapsule ?? null;
+  const objectives = options.objectives ?? objectiveContextSummary();
   const recommendations = sortRecommendations([
     ...accessoryRecommendations(accessories, budget),
     ...readinessRecommendations(readiness),
     ...memoryRecommendations(goal, memories),
     ...routeRecommendations(goal, areas, readiness),
   ]);
+  const workItems = planWorkItems(recommendations, budget);
+  const persistedObjectives = options.persistObjectives ? persistPlanObjectives(goal, workItems, options) : null;
 
   return {
     uuid: context.uuid,
@@ -281,6 +428,17 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       accessoryUpgradeCount: accessories?.upgrades?.length ?? 0,
       memoryCount: memories.length,
       usedMemories: relevantMemories(goal, memories),
+      contextCapsule: contextCapsule ? {
+        cache: contextCapsule.cache ?? null,
+        generatedAt: contextCapsule.generatedAt ?? null,
+        warningCount: (contextCapsule.warnings ?? []).length,
+        objectiveCounts: contextCapsule.objectives?.counts ?? null,
+      } : null,
+      objectives: {
+        counts: objectives.counts ?? null,
+        activeCount: objectives.active?.length ?? 0,
+        active: (objectives.active ?? []).slice(0, 10),
+      },
       config: {
         username: config.username ?? null,
         uuidConfigured: Boolean(config.uuid),
@@ -288,9 +446,18 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       },
     },
     recommendations,
+    immediateActions: workItems.immediateActions,
+    todoCandidates: workItems.todoCandidates,
+    buyListCandidates: workItems.buyListCandidates,
+    sourceItemCandidates: workItems.sourceItemCandidates,
+    snipeCandidates: workItems.snipeCandidates,
+    snipeTargets: workItems.snipeCandidates,
     whatToSkip: recommendations.filter((entry) => entry.category === "what_to_skip"),
+    skipGuidance: recommendations.filter((entry) => entry.category === "what_to_skip"),
+    persistedObjectives,
     sourceFreshness: {
       verifiedAt: VERIFIED_AT,
+      profile: contextCapsule?.cache ?? { status: "live", sourceProvider: "hypixel" },
       networthProviders: networth?.providerFreshness ?? [],
       accessoryProviders: accessories?.providerFreshness ?? [],
       profileSectionFormulas: [...new Set((progression?.sections ?? []).flatMap((section: any) => section.provenance?.formulas ?? []))],
@@ -299,8 +466,11 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       "Planner output is deterministic for identical structured inputs.",
       "Recommendations are ranked by explicit local heuristics, not hidden model state.",
       "Missing prices, profile sections, and unsupported exact formulas are warnings, not silently filled values.",
+      "Objective records are created or updated only when persistence is explicitly requested.",
     ],
     warnings: [
+      ...(options.contextWarnings ?? []),
+      ...(contextCapsule?.warnings ?? []).slice(0, 25),
       ...(networth?.warnings ?? []).slice(0, 25),
       ...(accessories?.warnings ?? []),
       ...readiness.flatMap((entry) => entry.warnings ?? []),
@@ -309,8 +479,34 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   };
 }
 
-export async function planGoalForPlayer(goal: string, player?: string, profile?: string, options: Parameters<typeof planGoalFromContext>[2] = {}) {
-  return planGoalFromContext(await fetchProfileContext(player, profile), goal, options);
+export async function planGoalForPlayer(goal: string, player?: string, profile?: string, options: Parameters<typeof planGoalFromContext>[2] & {
+  useContext?: boolean;
+  contextCacheOnly?: boolean;
+  contextAllowStale?: boolean;
+  contextTtlMs?: number;
+} = {}) {
+  let contextCapsule = options.contextCapsule ?? null;
+  const contextWarnings = [...(options.contextWarnings ?? [])];
+  if (options.useContext) {
+    try {
+      contextCapsule = await agentContextForPlayer(player, profile, {
+        cacheOnly: options.contextCacheOnly ?? true,
+        allowStale: options.contextAllowStale ?? true,
+        ttlMs: options.contextTtlMs,
+      });
+    } catch (error) {
+      contextWarnings.push({
+        code: "context_capsule_unavailable",
+        message: `Planner could not read context capsule: ${(error as Error).message}`,
+        sourcePath: "skyagent_context_bootstrap",
+      });
+    }
+  }
+  return planGoalFromContext(await fetchProfileContext(player, profile), goal, {
+    ...options,
+    contextCapsule,
+    contextWarnings,
+  });
 }
 
 export async function nextUpgradesFromContext(context: any, budget: number, options: {

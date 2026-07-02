@@ -80,7 +80,7 @@ Usage:
   skyagent progression [nameOrUuid] [profileIdOrName]
   skyagent weight [nameOrUuid] [profileIdOrName]
   skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]
-  skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
+  skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--use-context] [--persist-objectives] [--objective <id>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins> [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent item <internalId>
   skyagent price <itemId>
@@ -246,7 +246,10 @@ export function parsePlanArgs(args) {
   return {
     goal: args[0] ?? null,
     budget: budget === null ? null : Number(budget),
-    values: positionalArgs(args.slice(1), ["--budget", "--max-items", "--networth-timeout-ms", "--max-price-lookups", "--accessory-timeout-ms"]),
+    values: positionalArgs(args.slice(1), ["--budget", "--use-context", "--persist-objectives", "--objective", "--max-items", "--networth-timeout-ms", "--max-price-lookups", "--accessory-timeout-ms"]),
+    useContext: args.includes("--use-context"),
+    persistObjectives: args.includes("--persist-objectives"),
+    objectiveId: optionValue(args, "--objective"),
     maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
     networthTimeoutMs: optionalNumericOption(args, "--networth-timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
     maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
@@ -839,6 +842,9 @@ export async function command(args) {
     }
     print(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], {
       budget: parsed.budget,
+      useContext: parsed.useContext,
+      persistObjectives: parsed.persistObjectives,
+      objectiveId: parsed.objectiveId,
       maxItems: parsed.maxItems,
       networthTimeoutMs: parsed.networthTimeoutMs,
       maxPriceLookups: parsed.maxPriceLookups,

@@ -13,11 +13,11 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 
 ## Tool Routing
 
-- Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, prerequisites, and what to skip.
+- Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, prerequisites, immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, and what to skip. Set `useContext: true` for broad planning so cached profile/objective state is included before pulling raw details.
 - Include `budget` when the user gives coins available.
 - Use `skyblock_next_upgrades` for purchase ranking before recommending buys.
 - Use planner bounds (`maxItems`, `networthTimeoutMs`, `maxPriceLookups`, `accessoryTimeoutMs`) for broad plans so networth/accessory fanout cannot block the session indefinitely.
-- Use `skyagent_objective_create`, `skyagent_objective_list`, `skyagent_objective_update`, `skyagent_objective_complete`, and `skyagent_objective_delete` when a plan should become durable goals, tasks/todos, buy-list entries, source-list entries, or snipe targets.
+- Use `persistObjectives: true` on `skyblock_plan_goal`, or use `skyagent_objective_create`, `skyagent_objective_list`, `skyagent_objective_update`, `skyagent_objective_complete`, and `skyagent_objective_delete`, only when the user explicitly wants a plan written as durable goals, tasks/todos, buy-list entries, source-list entries, or snipe targets.
 - Start broad plans with `skyagent_context_bootstrap` so the plan has compact cached profile, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tools before pulling narrow details.
 - Pull supporting detail with `skyblock_profile_snapshot`, `skyblock_profile_overview`, `skyblock_progression`, `skyblock_readiness`, `skyblock_networth`, `skyblock_accessories`, `skyblock_price`, or `skyblock_price_history` when the plan output needs profile, economy, progression, readiness, or price context. Prefer the snapshot cache for repeated planning passes and refresh it when current progress matters.
 - Route patch-sensitive gear, money-making, class, boss, or route claims to `$skyagent-provider-maintenance` before making strong recommendations.
@@ -26,8 +26,9 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 
 - Preserve recommendation reason, expected impact, cost/time estimate, prerequisites, source freshness, uncertainty, and warnings.
 - Planner outputs may consume partial networth or accessory valuation. Keep those partial/stale/unknown-price warnings visible and avoid presenting bounded totals as complete.
+- Use the planner's `immediateActions`, `todoCandidates`, `buyListCandidates`, `sourceItemCandidates`, `snipeTargets`, and `skipGuidance` fields to structure the answer instead of reclassifying raw recommendations by hand.
 - Put immediate actions first, then medium-term route.
 - Say what to skip when the planner output includes skip guidance.
 - Do not recommend a buyable upgrade without budget and price evidence.
-- When the user accepts a route, persist it as objective/task entries; persist purchase candidates as `buy` entries and auction watch rules as `snipe` entries with `itemId`, `targetPrice`, `budget`, `priority`, source provider, freshness, and warnings.
+- When the user accepts a route, persist it as objective/task entries; persist purchase candidates as `buy` entries and auction watch rules as `snipe` entries with `itemId`, `targetPrice`, `budget`, `priority`, source provider, freshness, and warnings. Do not create or update objective records during preview-only planning.
 - Keep profile, economy, progression, readiness, and external meta assumptions visible in the final plan.
