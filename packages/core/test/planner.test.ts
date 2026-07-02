@@ -133,4 +133,31 @@ describe("planner", () => {
     expect(result.warnings.some((entry) => entry.code === "missing_api_data")).toBe(true);
     expect(result.warnings.some((entry) => entry.code === "networth_missing")).toBe(true);
   });
+
+  test("consumes partial bounded valuation without dropping recommendations", async () => {
+    const result = await planGoalFromContext(context(), "f7", {
+      budget: 1_000_000,
+      networthProvider: () => ({
+        status: "partial",
+        valuation: { status: "partial", pricedAttemptCount: 1, maxItems: 1 },
+        total: 25_000_000,
+        confidence: "low",
+        warnings: [{ code: "valuation_item_limit_reached" }],
+        providerFreshness: [],
+      }),
+      accessoriesProvider: () => ({
+        ...accessories([upgrade]),
+        status: "partial",
+        valuation: { status: "partial", priceLookupCount: 1, maxPriceLookups: 1 },
+        warnings: [{ code: "accessory_price_limit_reached" }],
+      }),
+      memories: [],
+      config: {},
+    });
+
+    expect(result.inputs.networth).toMatchObject({ status: "partial", valuation: { pricedAttemptCount: 1 } });
+    expect(result.recommendations).toContainEqual(expect.objectContaining({ id: "accessory-CHEAP_TALISMAN" }));
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "valuation_item_limit_reached" }));
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_price_limit_reached" }));
+  });
 });

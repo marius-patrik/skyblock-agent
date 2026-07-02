@@ -210,4 +210,87 @@ describe("networth calculation", () => {
     }]);
     expect(armor.unknownPrices).toEqual([]);
   });
+
+  test("bounds pricing work and returns compact partial valuation", async () => {
+    const result = await calculateNetworthFromInventory({
+      sections: [{
+        section: "backpacks",
+        label: "Backpacks",
+        available: true,
+        sourcePath: "inventory.backpack_contents",
+        items: [
+          stack("backpack_contents", "FIRST_ITEM", 1),
+          stack("backpack_contents", "SECOND_ITEM", 1),
+        ],
+        warnings: [],
+      }],
+      priceProvider: priceProvider({ FIRST_ITEM: 100, SECOND_ITEM: 200 }),
+      metadataProvider,
+      maxItems: 1,
+      includeItems: false,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.valuation).toMatchObject({ status: "partial", pricedAttemptCount: 1, maxItems: 1, itemsIncluded: false });
+    expect(result.sections[0]).toMatchObject({ total: 100, pricedCount: 1, unknownCount: 1, valuationStatus: "partial", items: [] });
+    expect(result.unknownPrices[0]).toMatchObject({ internalId: "SECOND_ITEM" });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "valuation_item_limit_reached" }));
+  });
+
+  test("times out a slow price provider and returns partial networth", async () => {
+    const result = await calculateNetworthFromInventory({
+      sections: [{
+        section: "inventory",
+        label: "Inventory",
+        available: true,
+        sourcePath: "inventory.inv_contents",
+        items: [stack("inv_contents", "SLOW_ITEM", 1)],
+        warnings: [],
+      }],
+      priceProvider: () => new Promise(() => {}),
+      metadataProvider,
+      timeoutMs: 25,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.valuation).toMatchObject({ status: "partial", pricedAttemptCount: 1, timeoutMs: 25 });
+    expect(result.sections[0]).toMatchObject({ valuationStatus: "partial", pricedCount: 0, unknownCount: 1 });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "valuation_timeout" }));
+  });
+
+  test("keeps stale provider metadata and warnings in compact section output", async () => {
+    const result = await calculateNetworthFromInventory({
+      sections: [{
+        section: "armor",
+        label: "Armor",
+        available: true,
+        sourcePath: "inventory.inv_armor",
+        items: [stack("inv_armor", "ASPECT_OF_THE_END", 1)],
+        warnings: [],
+      }],
+      priceProvider: async (internalId: string) => ({
+        itemId: internalId,
+        price: 200_000,
+        confidence: "low",
+        provider: {
+          source: "fixture-prices",
+          method: "stale-fixture",
+          url: null,
+          cacheStatus: "stale",
+          stale: true,
+          fetchedAt: "2026-07-01T00:00:00.000Z",
+        },
+        warnings: [{ code: "stale_cache", message: `Using stale cache for ${internalId}.` }],
+      }),
+      metadataProvider,
+      includeItems: false,
+    });
+    const armor = itemNetworthFromResult(result, "armor");
+
+    expect(result.sections[0].items).toEqual([]);
+    expect(result.sections[0].providerFreshness).toContainEqual(expect.objectContaining({ source: "fixture-prices", cacheStatus: "stale", stale: true }));
+    expect(result.sections[0].warnings).toContainEqual(expect.objectContaining({ code: "stale_cache" }));
+    expect(armor.providerFreshness).toContainEqual(expect.objectContaining({ source: "fixture-prices", cacheStatus: "stale", stale: true }));
+    expect(armor.confidence).toBe("low");
+  });
 });

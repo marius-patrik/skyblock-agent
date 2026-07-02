@@ -385,6 +385,9 @@ export const tools = [
       properties: {
         player: { type: "string" },
         profile: { type: "string" },
+        maxItems: { type: "number" },
+        timeoutMs: { type: "number" },
+        includeItems: { type: "boolean" },
       },
       additionalProperties: false,
     },
@@ -398,6 +401,9 @@ export const tools = [
         section: { type: "string" },
         player: { type: "string" },
         profile: { type: "string" },
+        maxItems: { type: "number" },
+        timeoutMs: { type: "number" },
+        includeItems: { type: "boolean" },
       },
       required: ["section"],
       additionalProperties: false,
@@ -411,6 +417,8 @@ export const tools = [
       properties: {
         player: { type: "string" },
         profile: { type: "string" },
+        maxPriceLookups: { type: "number" },
+        timeoutMs: { type: "number" },
       },
       additionalProperties: false,
     },
@@ -423,6 +431,8 @@ export const tools = [
       properties: {
         player: { type: "string" },
         profile: { type: "string" },
+        maxPriceLookups: { type: "number" },
+        timeoutMs: { type: "number" },
       },
       additionalProperties: false,
     },
@@ -436,6 +446,8 @@ export const tools = [
         player: { type: "string" },
         profile: { type: "string" },
         budget: { type: "number" },
+        maxPriceLookups: { type: "number" },
+        timeoutMs: { type: "number" },
       },
       additionalProperties: false,
     },
@@ -502,6 +514,10 @@ export const tools = [
         player: { type: "string" },
         profile: { type: "string" },
         budget: { type: "number" },
+        maxItems: { type: "number" },
+        networthTimeoutMs: { type: "number" },
+        maxPriceLookups: { type: "number" },
+        accessoryTimeoutMs: { type: "number" },
       },
       required: ["goal"],
       additionalProperties: false,
@@ -516,6 +532,8 @@ export const tools = [
         player: { type: "string" },
         profile: { type: "string" },
         budget: { type: "number" },
+        maxPriceLookups: { type: "number" },
+        accessoryTimeoutMs: { type: "number" },
       },
       required: ["budget"],
       additionalProperties: false,
@@ -804,18 +822,35 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
     case "skyblock_normalized_items":
       return normalizedItemsForPlayer(args.player, args.profile);
     case "skyblock_networth":
-      return networthForPlayer(args.player, args.profile);
+      return networthForPlayer(args.player, args.profile, {
+        maxItems: args.maxItems,
+        timeoutMs: args.timeoutMs,
+        includeItems: args.includeItems,
+      });
     case "skyblock_item_networth":
-      return itemNetworthForPlayer(args.player, args.profile, args.section);
+      return itemNetworthForPlayer(args.player, args.profile, args.section, {
+        maxItems: args.maxItems,
+        timeoutMs: args.timeoutMs,
+        includeItems: args.includeItems,
+      });
     case "skyblock_accessories":
-      return accessoriesForPlayer(args.player, args.profile);
+      return accessoriesForPlayer(args.player, args.profile, {
+        maxPriceLookups: args.maxPriceLookups,
+        timeoutMs: args.timeoutMs,
+      });
     case "skyblock_missing_accessories":
-      return missingAccessoriesForPlayer(args.player, args.profile);
+      return missingAccessoriesForPlayer(args.player, args.profile, {
+        maxPriceLookups: args.maxPriceLookups,
+        timeoutMs: args.timeoutMs,
+      });
     case "skyblock_accessory_upgrades":
       if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
         throw new Error("budget must be a non-negative finite number when provided.");
       }
-      return accessoryUpgradesForPlayer(args.player, args.profile, args.budget ?? null);
+      return accessoryUpgradesForPlayer(args.player, args.profile, args.budget ?? null, {
+        maxPriceLookups: args.maxPriceLookups,
+        timeoutMs: args.timeoutMs,
+      });
     case "skyblock_profile_section":
       return profileSectionForPlayer(args.section, args.player, args.profile);
     case "skyblock_progression":
@@ -828,12 +863,21 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
         throw new Error("budget must be a non-negative finite number when provided.");
       }
-      return planGoalForPlayer(args.goal, args.player, args.profile, { budget: args.budget ?? null });
+      return planGoalForPlayer(args.goal, args.player, args.profile, {
+        budget: args.budget ?? null,
+        maxItems: args.maxItems,
+        networthTimeoutMs: args.networthTimeoutMs,
+        maxPriceLookups: args.maxPriceLookups,
+        accessoryTimeoutMs: args.accessoryTimeoutMs,
+      });
     case "skyblock_next_upgrades":
       if (!Number.isFinite(args.budget) || args.budget < 0) {
         throw new Error("budget must be a non-negative finite number.");
       }
-      return nextUpgradesForPlayer(args.player, args.profile, args.budget);
+      return nextUpgradesForPlayer(args.player, args.profile, args.budget, {
+        maxPriceLookups: args.maxPriceLookups,
+        accessoryTimeoutMs: args.accessoryTimeoutMs,
+      });
     case "skyblock_item_metadata":
       return itemMetadata(args.internalId);
     case "skyblock_price":

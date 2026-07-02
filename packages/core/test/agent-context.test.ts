@@ -37,6 +37,7 @@ function context() {
 describe("agent context capsule", () => {
   test("builds compact session context without raw payloads", async () => {
     const base = context();
+    let accessoryOptions: Record<string, any> | null = null;
     const capsule = await buildAgentContext(base, {
       now: 1_000,
       snapshot: buildProfileSnapshot(base, { ttlMs: 60_000, fetchedAtMs: 1_000 }),
@@ -50,7 +51,11 @@ describe("agent context capsule", () => {
         counts: { objective: 1, task: 1, buy: 0, source: 0, snipe: 0 },
         active: [{ id: "objective_1", itemKind: "objective", title: "Prepare M5", status: "active" }],
       },
-      accessoriesProvider: async () => ({
+      accessoriesProvider: async (_member: any, options: Record<string, any>) => {
+        accessoryOptions = options;
+        return ({
+        status: "partial",
+        valuation: { status: "partial", priceLookupCount: 75, maxPriceLookups: 75, timeoutMs: 8_000 },
         magicalPower: { estimated: 42, exact: false },
         owned: [{ internalId: "TALISMAN" }],
         activeAccessories: [{ internalId: "TALISMAN" }],
@@ -58,15 +63,24 @@ describe("agent context capsule", () => {
         missing: [{ internalId: "MISSING_TALISMAN" }],
         cheapestMissing: [{ internalId: "MISSING_TALISMAN", name: "Missing Talisman", price: 1000, magicalPower: 3 }],
         providerFreshness: [{ provider: "test", status: "fresh" }],
-        warnings: [],
-      }),
+        warnings: [{ code: "accessory_price_limit_reached", message: "Bounded test" }],
+      });
+      },
     });
 
+    expect(accessoryOptions).toMatchObject({ budget: null, maxPriceLookups: 75, timeoutMs: 8_000 });
     expect(capsule.kind).toBe("skyagent.agentContext");
     expect(capsule.rawPayloadsIncluded).toBe(false);
     expect(capsule.player.uuid).toBe(uuid);
     expect(capsule.economy.purse).toBe(123);
-    expect(capsule.accessories).toMatchObject({ ownedCount: 1, activeCount: 1, missingCount: 1 });
+    expect(capsule.accessories).toMatchObject({
+      status: "partial",
+      valuation: { status: "partial", maxPriceLookups: 75 },
+      ownedCount: 1,
+      activeCount: 1,
+      missingCount: 1,
+    });
+    expect(capsule.accessories.warnings).toContainEqual(expect.objectContaining({ code: "accessory_price_limit_reached" }));
     expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ title: "Prepare M5" }));
     expect(capsule.pets.activePet).toMatchObject({ internalId: "SHEEP", active: true });
     expect(capsule.pets.items).toContainEqual(expect.objectContaining({ internalId: "SHEEP", active: true }));

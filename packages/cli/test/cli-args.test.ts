@@ -46,6 +46,16 @@ describe("CLI argument parsing", () => {
     expect(parseItemNetworthArgs(["Notch", "Apple", "--section", "armor"])).toEqual({
       section: "armor",
       values: ["Notch", "Apple"],
+      maxItems: 150,
+      timeoutMs: 8_000,
+      includeItems: true,
+    });
+    expect(parseItemNetworthArgs(["Notch", "--section", "armor", "--max-items", "25", "--timeout-ms", "500", "--summary"])).toEqual({
+      section: "armor",
+      values: ["Notch"],
+      maxItems: 25,
+      timeoutMs: 500,
+      includeItems: false,
     });
   });
 
@@ -53,6 +63,14 @@ describe("CLI argument parsing", () => {
     expect(parseAccessoryUpgradeArgs(["Notch", "Apple", "--budget", "1000000"])).toEqual({
       budget: 1_000_000,
       values: ["Notch", "Apple"],
+      maxPriceLookups: 75,
+      timeoutMs: 8_000,
+    });
+    expect(parseAccessoryUpgradeArgs(["Notch", "Apple", "--budget", "1000000", "--max-price-lookups", "20", "--timeout-ms", "750"])).toEqual({
+      budget: 1_000_000,
+      values: ["Notch", "Apple"],
+      maxPriceLookups: 20,
+      timeoutMs: 750,
     });
   });
 
@@ -60,10 +78,20 @@ describe("CLI argument parsing", () => {
     expect(parseNextUpgradesArgs(["Notch", "Apple", "--budget", "1000000"])).toEqual({
       budget: 1_000_000,
       values: ["Notch", "Apple"],
+      maxPriceLookups: 75,
+      accessoryTimeoutMs: 8_000,
     });
     expect(parseNextUpgradesArgs(["--budget", "1000000"])).toEqual({
       budget: 1_000_000,
       values: [],
+      maxPriceLookups: 75,
+      accessoryTimeoutMs: 8_000,
+    });
+    expect(parseNextUpgradesArgs(["Notch", "--budget", "1000000", "--max-price-lookups", "30", "--accessory-timeout-ms", "1200"])).toEqual({
+      budget: 1_000_000,
+      values: ["Notch"],
+      maxPriceLookups: 30,
+      accessoryTimeoutMs: 1200,
     });
   });
 
@@ -72,11 +100,28 @@ describe("CLI argument parsing", () => {
       goal: "f7",
       budget: 1_000_000,
       values: ["Notch", "Apple"],
+      maxItems: 150,
+      networthTimeoutMs: 8_000,
+      maxPriceLookups: 75,
+      accessoryTimeoutMs: 8_000,
     });
     expect(parsePlanArgs(["garden"])).toEqual({
       goal: "garden",
       budget: null,
       values: [],
+      maxItems: 150,
+      networthTimeoutMs: 8_000,
+      maxPriceLookups: 75,
+      accessoryTimeoutMs: 8_000,
+    });
+    expect(parsePlanArgs(["f7", "Notch", "--budget", "1000000", "--max-items", "50", "--networth-timeout-ms", "1000", "--max-price-lookups", "25", "--accessory-timeout-ms", "1500"])).toEqual({
+      goal: "f7",
+      budget: 1_000_000,
+      values: ["Notch"],
+      maxItems: 50,
+      networthTimeoutMs: 1000,
+      maxPriceLookups: 25,
+      accessoryTimeoutMs: 1500,
     });
   });
 

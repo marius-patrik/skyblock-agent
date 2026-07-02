@@ -15,6 +15,8 @@ Packages:
 
 The CLI is the control plane. It owns setup, diagnostics, gateway lifecycle, web lifecycle, updates, and direct scriptable commands.
 
+Valuation-heavy commands and tools must be bounded for agent use. Networth and accessory pricing surfaces expose item/lookup limits plus timeouts, return `complete` or `partial` valuation status, preserve stale-cache and unknown-price warnings, and keep compact summaries as the planner default. Full item arrays and large debug payloads stay opt-in through explicit detail/debug commands or flags.
+
 ## CLI Contract
 
 Non-interactive commands stay stable and call `core` directly by default. They must not require the gateway, TUI, MCP, or web app.

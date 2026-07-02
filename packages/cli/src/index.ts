@@ -6,11 +6,11 @@ import path from "node:path";
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { agentContextForPlayer } from "@skyagent/core/agent-context";
 import { persistContextEvent, readPersistedContextEvents, serverStatusForPlayer, subscribeContextEvents } from "@skyagent/core/context-events";
-import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
+import { DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS, DEFAULT_ACCESSORY_TIMEOUT_MS, accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
-import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
+import { DEFAULT_NETWORTH_INCLUDE_ITEMS, DEFAULT_NETWORTH_MAX_ITEMS, DEFAULT_NETWORTH_TIMEOUT_MS, itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
@@ -71,17 +71,17 @@ Usage:
   skyagent inventory-section <section> [nameOrUuid] [profileIdOrName] [--debug-raw]
   skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section> [--debug-raw]
   skyagent normalize-items [nameOrUuid] [profileIdOrName]
-  skyagent networth [nameOrUuid] [profileIdOrName]
-  skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>
-  skyagent accessories [nameOrUuid] [profileIdOrName]
-  skyagent missing-accessories [nameOrUuid] [profileIdOrName]
-  skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>
+  skyagent networth [nameOrUuid] [profileIdOrName] [--max-items <n>] [--timeout-ms <ms>] [--details]
+  skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section> [--max-items <n>] [--timeout-ms <ms>] [--summary]
+  skyagent accessories [nameOrUuid] [profileIdOrName] [--max-price-lookups <n>] [--timeout-ms <ms>]
+  skyagent missing-accessories [nameOrUuid] [profileIdOrName] [--max-price-lookups <n>] [--timeout-ms <ms>]
+  skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins> [--max-price-lookups <n>] [--timeout-ms <ms>]
   skyagent section <name> [nameOrUuid] [profileIdOrName]
   skyagent progression [nameOrUuid] [profileIdOrName]
   skyagent weight [nameOrUuid] [profileIdOrName]
   skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]
-  skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]
-  skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>
+  skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
+  skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins> [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent item <internalId>
   skyagent price <itemId>
   skyagent lbin <itemId>
@@ -197,7 +197,28 @@ export function parseItemNetworthArgs(args) {
   const section = optionValue(args, "--section");
   return {
     section,
-    values: positionalArgs(args, ["--section"]),
+    values: positionalArgs(args, ["--section", "--max-items", "--timeout-ms", "--summary", "--details"]),
+    ...parseNetworthBounds(args, true),
+  };
+}
+
+function optionalNumericOption(args, option) {
+  const value = optionValue(args, option);
+  return value === null ? undefined : Number(value);
+}
+
+function parseNetworthBounds(args, defaultIncludeItems = DEFAULT_NETWORTH_INCLUDE_ITEMS) {
+  return {
+    maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
+    timeoutMs: optionalNumericOption(args, "--timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
+    includeItems: args.includes("--summary") ? false : args.includes("--details") ? true : defaultIncludeItems,
+  };
+}
+
+function parseAccessoryBounds(args) {
+  return {
+    maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
+    timeoutMs: optionalNumericOption(args, "--timeout-ms") ?? optionalNumericOption(args, "--accessory-timeout-ms") ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
   };
 }
 
@@ -205,7 +226,8 @@ export function parseAccessoryUpgradeArgs(args) {
   const budget = optionValue(args, "--budget");
   return {
     budget: budget === null ? null : Number(budget),
-    values: positionalArgs(args, ["--budget"]),
+    values: positionalArgs(args, ["--budget", "--max-price-lookups", "--timeout-ms", "--accessory-timeout-ms"]),
+    ...parseAccessoryBounds(args),
   };
 }
 
@@ -213,7 +235,9 @@ export function parseNextUpgradesArgs(args) {
   const budget = optionValue(args, "--budget");
   return {
     budget: budget === null ? null : Number(budget),
-    values: positionalArgs(args, ["--budget"]),
+    values: positionalArgs(args, ["--budget", "--max-price-lookups", "--accessory-timeout-ms"]),
+    maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
+    accessoryTimeoutMs: optionalNumericOption(args, "--accessory-timeout-ms") ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
   };
 }
 
@@ -222,7 +246,11 @@ export function parsePlanArgs(args) {
   return {
     goal: args[0] ?? null,
     budget: budget === null ? null : Number(budget),
-    values: positionalArgs(args.slice(1), ["--budget"]),
+    values: positionalArgs(args.slice(1), ["--budget", "--max-items", "--networth-timeout-ms", "--max-price-lookups", "--accessory-timeout-ms"]),
+    maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
+    networthTimeoutMs: optionalNumericOption(args, "--networth-timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
+    maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
+    accessoryTimeoutMs: optionalNumericOption(args, "--accessory-timeout-ms") ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
   };
 }
 
@@ -726,8 +754,10 @@ export async function command(args) {
   }
 
   if (area === "networth") {
-    const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await networthForPlayer(values[0], values[1]));
+    const args = [action, ...rest].filter(Boolean);
+    const values = positionalArgs(args, ["--max-items", "--timeout-ms", "--summary", "--details"]);
+    const bounds = parseNetworthBounds(args);
+    print(await networthForPlayer(values[0], values[1], bounds));
     return;
   }
 
@@ -737,19 +767,25 @@ export async function command(args) {
     if (!parsed.section) {
       throw new Error("Usage: skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>");
     }
-    print(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section));
+    print(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section, {
+      maxItems: parsed.maxItems,
+      timeoutMs: parsed.timeoutMs,
+      includeItems: parsed.includeItems,
+    }));
     return;
   }
 
   if (area === "accessories") {
-    const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await accessoriesForPlayer(values[0], values[1]));
+    const args = [action, ...rest].filter(Boolean);
+    const values = positionalArgs(args, ["--max-price-lookups", "--timeout-ms"]);
+    print(await accessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
     return;
   }
 
   if (area === "missing-accessories") {
-    const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await missingAccessoriesForPlayer(values[0], values[1]));
+    const args = [action, ...rest].filter(Boolean);
+    const values = positionalArgs(args, ["--max-price-lookups", "--timeout-ms"]);
+    print(await missingAccessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
     return;
   }
 
@@ -758,7 +794,10 @@ export async function command(args) {
     if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
       throw new Error("Usage: skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
     }
-    print(await accessoryUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget));
+    print(await accessoryUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
+      maxPriceLookups: parsed.maxPriceLookups,
+      timeoutMs: parsed.timeoutMs,
+    }));
     return;
   }
 
@@ -798,7 +837,13 @@ export async function command(args) {
     if (parsed.budget !== null && (!Number.isFinite(parsed.budget) || parsed.budget < 0)) {
       throw new Error("Usage: skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
     }
-    print(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], { budget: parsed.budget }));
+    print(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], {
+      budget: parsed.budget,
+      maxItems: parsed.maxItems,
+      networthTimeoutMs: parsed.networthTimeoutMs,
+      maxPriceLookups: parsed.maxPriceLookups,
+      accessoryTimeoutMs: parsed.accessoryTimeoutMs,
+    }));
     return;
   }
 
@@ -807,7 +852,10 @@ export async function command(args) {
     if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
       throw new Error("Usage: skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
     }
-    print(await nextUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget));
+    print(await nextUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
+      maxPriceLookups: parsed.maxPriceLookups,
+      accessoryTimeoutMs: parsed.accessoryTimeoutMs,
+    }));
     return;
   }
 

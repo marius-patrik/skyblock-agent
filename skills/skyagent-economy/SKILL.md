@@ -19,10 +19,12 @@ Use this skill when the user asks about coins, prices, networth, Bazaar, auction
 - Use `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_auctions_ended`, and `skyblock_firesales` for live economy surfaces.
 - Use `skyblock_networth` for full sectioned networth, purse/bank/item totals, unknown prices, assumptions, and provider freshness.
 - Use `skyblock_item_networth` for one inventory section such as armor, equipment, wardrobe, backpacks, accessory bag, or pets.
+- For agent summaries, pass bounded controls such as `maxItems`, `timeoutMs`, and `includeItems: false` when full item arrays are not required. Request item-level output only for explicit detail/debug work.
 
 ## Rules
 
 - Treat `candidatePrice` as partial unless `price` is non-null.
+- Treat networth `status` or section `valuationStatus` of `partial` as incomplete coverage caused by bounds, timeout, provider failure, or unresolved prices; carry the warning codes forward instead of treating totals as exhaustive.
 - Carry provider freshness, confidence, fallback chain, cache status, stale status, and warnings into recommendations.
 - Call out third-party uncertainty for CoflNet-compatible LBIN/history and any community/provider-derived data.
 - Treat prices as volatile; avoid strong buy/sell timing claims without recent provider data and history.

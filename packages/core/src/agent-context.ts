@@ -86,6 +86,8 @@ function followUpTools() {
 
 function compactAccessories(accessories: any) {
   return {
+    status: accessories.status ?? "complete",
+    valuation: accessories.valuation ?? null,
     magicalPower: accessories.magicalPower,
     ownedCount: accessories.owned?.length ?? 0,
     activeCount: accessories.activeAccessories?.length ?? 0,
@@ -98,6 +100,7 @@ function compactAccessories(accessories: any) {
       magicalPower: entry.magicalPower,
     })),
     providerFreshness: accessories.providerFreshness ?? [],
+    warnings: compactWarnings(accessories.warnings ?? [], 8),
   };
 }
 
@@ -200,7 +203,11 @@ export async function buildAgentContext(context: any, options: Record<string, an
     inventorySectionFromMember(context.member, "equipment"),
     inventorySectionFromMember(context.member, "wardrobe"),
     inventorySectionFromMember(context.member, "pets"),
-    (options.accessoriesProvider ?? calculateAccessoriesFromMember)(context.member, { budget: null }),
+    (options.accessoriesProvider ?? calculateAccessoriesFromMember)(context.member, {
+      budget: null,
+      maxPriceLookups: options.maxPriceLookups ?? 75,
+      timeoutMs: options.accessoryTimeoutMs ?? 8_000,
+    }),
   ]);
   const readiness = READINESS_AREAS.map((area) => readinessFromContext(context, area));
   const providers = options.providers ?? providerStatusWithEvent();

@@ -211,6 +211,68 @@ describe("accessory analysis", () => {
     expect(result.upgrades.map((entry) => entry.internalId)).toEqual(["SPEED_TALISMAN"]);
   });
 
+  test("bounds accessory price lookups and returns partial valuation", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({
+        SPEED_TALISMAN: 90_000,
+        SPEED_RING: 250_000,
+        SPEED_ARTIFACT: 700_000,
+        VACCINE_TALISMAN: 50_000,
+        SHINY_RELIC: 2_400_000,
+      }),
+      maxPriceLookups: 1,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.valuation).toMatchObject({ status: "partial", priceLookupCount: 1, maxPriceLookups: 1 });
+    expect(result.cheapestMissing).toHaveLength(1);
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_price_limit_reached" }));
+  });
+
+  test("times out a slow accessory price provider and returns partial valuation", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([]), {
+      metadataProvider,
+      accessoryMetadataProvider: () => accessoryMetadataProviderResult([
+        { internalId: "SPEED_TALISMAN", displayName: "Speed Talisman", rarity: "COMMON", family: "SPEED" },
+      ], "fixture-accessories"),
+      priceProvider: () => new Promise(() => {}),
+      timeoutMs: 25,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.valuation).toMatchObject({ status: "partial", priceLookupCount: 1, timeoutMs: 25 });
+    expect(result.cheapestMissing).toEqual([]);
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_price_timeout" }));
+  });
+
+  test("surfaces stale accessory price cache warnings and provider freshness", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([]), {
+      metadataProvider,
+      accessoryMetadataProvider: () => accessoryMetadataProviderResult([
+        { internalId: "SPEED_TALISMAN", displayName: "Speed Talisman", rarity: "COMMON", family: "SPEED" },
+      ], "fixture-accessories"),
+      priceProvider: async (internalId: string) => ({
+        itemId: internalId,
+        price: 90_000,
+        confidence: "low",
+        provider: {
+          source: "fixture-prices",
+          method: "stale-fixture",
+          cacheStatus: "stale",
+          stale: true,
+          fetchedAt: "2026-07-01T00:00:00.000Z",
+        },
+        warnings: [{ code: "stale_cache", message: `Using stale cache for ${internalId}.` }],
+      }),
+    });
+
+    expect(result.status).toBe("complete");
+    expect(result.providerFreshness).toContainEqual(expect.objectContaining({ source: "fixture-prices", cacheStatus: "stale" }));
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "stale_cache" }));
+  });
+
   test("recommends higher-tier accessories within an owned upgrade family", async () => {
     const result = await calculateAccessoriesFromMember(memberWithAccessories([
       item(0, "SPEED_TALISMAN", "COMMON"),

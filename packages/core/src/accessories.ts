@@ -26,6 +26,9 @@ const ASSUMPTIONS = [
   "Enrichment state is detected from exposed item attributes when present and is otherwise unknown.",
 ];
 
+export const DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS = 75;
+export const DEFAULT_ACCESSORY_TIMEOUT_MS = 8_000;
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -188,8 +191,18 @@ function providerFreshness(...providers: any[]) {
   }));
 }
 
-async function pricedUpgrade(accessory: any, gain: number, priceProvider: any, budget: number | null) {
-  const price = await priceProvider(accessory.internalId);
+function priceWarningCodes() {
+  return new Set([
+    "accessory_price_limit_reached",
+    "accessory_price_timeout",
+    "price_unavailable",
+    "provider_failed",
+    "stale_cache",
+    "cache_stale",
+  ]);
+}
+
+function upgradeFromPrice(accessory: any, gain: number, price: any, budget: number | null) {
   const resolved = typeof price?.price === "number" && Number.isFinite(price.price) && price.price > 0 ? price.price : null;
   return {
     internalId: accessory.internalId,
@@ -206,11 +219,54 @@ async function pricedUpgrade(accessory: any, gain: number, priceProvider: any, b
   };
 }
 
+function timeoutPrice(internalId: string, timeoutMs: number | undefined) {
+  return {
+    itemId: internalId,
+    price: null,
+    candidatePrice: null,
+    confidence: "none",
+    provider: null,
+    warnings: [{
+      code: "accessory_price_timeout",
+      message: `Skipped accessory pricing because timeoutMs=${timeoutMs} elapsed.`,
+    }],
+  };
+}
+
+async function withDeadline<T>(operation: Promise<T>, deadline: number | null, timeoutValue: T) {
+  if (deadline === null) {
+    return { value: await operation, timedOut: false };
+  }
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) {
+    return { value: timeoutValue, timedOut: true };
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    operation.then((value) => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      return { value, timedOut: false };
+    }, (error) => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      throw error;
+    }),
+    new Promise<{ value: T; timedOut: boolean }>((resolve) => {
+      timer = setTimeout(() => resolve({ value: timeoutValue, timedOut: true }), remainingMs);
+    }),
+  ]);
+}
+
 export async function calculateAccessoriesFromMember(member: any, options: {
   metadataProvider?: (internalId: string) => Promise<any> | any;
   accessoryMetadataProvider?: () => Promise<any> | any;
   priceProvider?: (internalId: string) => Promise<any> | any;
   budget?: number | null;
+  maxPriceLookups?: number;
+  timeoutMs?: number;
 } = {}) {
   const metadataProvider = options.metadataProvider ?? itemMetadata;
   const universeResult = await (options.accessoryMetadataProvider ?? hypixelAccessoryMetadataProvider)();
@@ -276,6 +332,10 @@ export async function calculateAccessoriesFromMember(member: any, options: {
     }));
   const priceProvider = options.priceProvider ?? itemPrice;
   const budget = options.budget === undefined ? null : options.budget;
+  const maxPriceLookups = options.maxPriceLookups === undefined ? Infinity : Math.max(0, Number(options.maxPriceLookups));
+  const deadline = options.timeoutMs === undefined ? null : Date.now() + Math.max(0, Number(options.timeoutMs));
+  let priceLookupCount = 0;
+  let partial = false;
   const nextMissingByFamily = new Map();
   const mpUpgradeCandidates = missing.filter((entry) => entry.magicalPower > (currentMpByFamily.get(entry.family) ?? 0));
   for (const accessory of [...mpUpgradeCandidates].sort((a, b) => {
@@ -289,7 +349,41 @@ export async function calculateAccessoriesFromMember(member: any, options: {
   const pricedMissing = [];
   for (const accessory of missing) {
     const gain = Math.max(0, accessory.magicalPower - (currentMpByFamily.get(accessory.family) ?? 0));
-    pricedMissing.push(await pricedUpgrade(accessory, gain, priceProvider, budget));
+    const limitReached = priceLookupCount >= maxPriceLookups;
+    const timedOut = deadline !== null && Date.now() >= deadline;
+    if (limitReached || timedOut) {
+      partial = true;
+      const code = limitReached ? "accessory_price_limit_reached" : "accessory_price_timeout";
+      pricedMissing.push({
+        internalId: accessory.internalId,
+        displayName: accessory.displayName,
+        family: accessory.family,
+        rarity: accessory.rarity,
+        magicalPowerGain: gain,
+        price: null,
+        candidatePrice: null,
+        coinPerMagicalPower: null,
+        withinBudget: false,
+        provider: null,
+        warnings: [{
+          code,
+          message: limitReached
+            ? `Skipped accessory pricing after ${priceLookupCount} lookups because maxPriceLookups=${maxPriceLookups}.`
+            : `Skipped accessory pricing because timeoutMs=${options.timeoutMs} elapsed.`,
+        }],
+      });
+      continue;
+    }
+    priceLookupCount += 1;
+    const priced = await withDeadline(
+      Promise.resolve(priceProvider(accessory.internalId)),
+      deadline,
+      timeoutPrice(accessory.internalId, options.timeoutMs),
+    );
+    if (priced.timedOut) {
+      partial = true;
+    }
+    pricedMissing.push(upgradeFromPrice(accessory, gain, priced.value, budget));
   }
   pricedMissing.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
   const nextUpgradeIds = new Set([...nextMissingByFamily.values()].map((entry) => entry.internalId));
@@ -297,8 +391,16 @@ export async function calculateAccessoriesFromMember(member: any, options: {
     .filter((entry) => nextUpgradeIds.has(entry.internalId))
     .filter((entry) => entry.magicalPowerGain > 0 && entry.withinBudget)
     .sort((a, b) => (a.coinPerMagicalPower ?? Infinity) - (b.coinPerMagicalPower ?? Infinity));
+  const warningCodes = priceWarningCodes();
 
   return {
+    status: partial ? "partial" : "complete",
+    valuation: {
+      status: partial ? "partial" : "complete",
+      priceLookupCount,
+      maxPriceLookups: Number.isFinite(maxPriceLookups) ? maxPriceLookups : null,
+      timeoutMs: options.timeoutMs ?? null,
+    },
     magicalPower: {
       estimated: active.reduce((total, item) => total + item.magicalPower, 0),
       exact: active.every((item) => item.exact),
@@ -310,9 +412,12 @@ export async function calculateAccessoriesFromMember(member: any, options: {
     cheapestMissing: pricedMissing.filter((entry) => entry.price !== null).slice(0, 25),
     upgrades,
     ignoredItems: normalized.items.filter((entry) => !isAccessory(entry, universeById)),
-    providerFreshness: providerFreshness(universeResult.provider),
+    providerFreshness: providerFreshness(universeResult.provider, ...pricedMissing.map((entry) => entry.provider)),
     assumptions: ASSUMPTIONS,
-    warnings,
+    warnings: [
+      ...warnings,
+      ...pricedMissing.flatMap((entry) => (entry.warnings ?? []).filter((warning: any) => warningCodes.has(warning.code))),
+    ],
   };
 }
 
@@ -321,9 +426,15 @@ export async function accessoriesForPlayer(player?: string, profile?: string, op
   accessoryMetadataProvider?: () => Promise<any> | any;
   priceProvider?: (internalId: string) => Promise<any> | any;
   budget?: number | null;
+  maxPriceLookups?: number;
+  timeoutMs?: number;
 } = {}) {
   const context = await fetchProfileContext(player, profile);
-  const result = await calculateAccessoriesFromMember(context.member, options);
+  const result = await calculateAccessoriesFromMember(context.member, {
+    ...options,
+    maxPriceLookups: options.maxPriceLookups ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
+    timeoutMs: options.timeoutMs ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
+  });
   return {
     uuid: context.uuid,
     profile: {
@@ -340,6 +451,8 @@ export async function missingAccessoriesForPlayer(player?: string, profile?: str
   return {
     uuid: result.uuid,
     profile: result.profile,
+    status: result.status,
+    valuation: result.valuation,
     missing: result.missing,
     cheapestMissing: result.cheapestMissing,
     providerFreshness: result.providerFreshness,
@@ -355,6 +468,8 @@ export async function accessoryUpgradesForPlayer(player?: string, profile?: stri
     uuid: result.uuid,
     profile: result.profile,
     budget,
+    status: result.status,
+    valuation: result.valuation,
     magicalPower: result.magicalPower,
     upgrades: result.upgrades,
     providerFreshness: result.providerFreshness,

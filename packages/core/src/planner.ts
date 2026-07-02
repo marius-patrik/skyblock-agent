@@ -220,6 +220,10 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   networthProvider?: (context: any) => Promise<any> | any;
   accessoriesProvider?: (member: any, budget: number | null) => Promise<any> | any;
   progressionProvider?: (context: any) => Promise<any> | any;
+  maxItems?: number;
+  networthTimeoutMs?: number;
+  maxPriceLookups?: number;
+  accessoryTimeoutMs?: number;
 } = {}) {
   const areas = goalAreas(goal);
   const budget = options.budget ?? null;
@@ -228,8 +232,16 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   }
   const readiness = areas.map((area) => readinessFromContext(context, area));
   const progression = await (options.progressionProvider ?? progressionFromContext)(context);
-  const networth = await (options.networthProvider ?? networthForContext)(context);
-  const accessories = await (options.accessoriesProvider ?? ((member: any, accessoryBudget: number | null) => calculateAccessoriesFromMember(member, { budget: accessoryBudget })))(context.member, budget);
+  const networth = await (options.networthProvider ?? ((input: any) => networthForContext(input, {
+    maxItems: options.maxItems ?? 150,
+    timeoutMs: options.networthTimeoutMs ?? 8_000,
+    includeItems: false,
+  })))(context);
+  const accessories = await (options.accessoriesProvider ?? ((member: any, accessoryBudget: number | null) => calculateAccessoriesFromMember(member, {
+    budget: accessoryBudget,
+    maxPriceLookups: options.maxPriceLookups ?? 75,
+    timeoutMs: options.accessoryTimeoutMs ?? 8_000,
+  })))(context.member, budget);
   const memories = options.memories ?? readMemories();
   const config = options.config ?? publicConfig();
   const recommendations = sortRecommendations([
@@ -252,6 +264,8 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       budget,
       networth: {
         total: networth?.total ?? null,
+        status: networth?.status ?? null,
+        valuation: networth?.valuation ?? null,
         confidence: networth?.confidence ?? null,
         warnings: networth?.warnings ?? [],
       },
@@ -301,11 +315,17 @@ export async function planGoalForPlayer(goal: string, player?: string, profile?:
 
 export async function nextUpgradesFromContext(context: any, budget: number, options: {
   accessoriesProvider?: (member: any, budget: number | null) => Promise<any> | any;
+  maxPriceLookups?: number;
+  accessoryTimeoutMs?: number;
 } = {}) {
   if (!Number.isFinite(budget) || budget < 0) {
     throw new Error("budget must be a non-negative finite number.");
   }
-  const accessories = await (options.accessoriesProvider ?? ((member: any, accessoryBudget: number | null) => calculateAccessoriesFromMember(member, { budget: accessoryBudget })))(context.member, budget);
+  const accessories = await (options.accessoriesProvider ?? ((member: any, accessoryBudget: number | null) => calculateAccessoriesFromMember(member, {
+    budget: accessoryBudget,
+    maxPriceLookups: options.maxPriceLookups ?? 75,
+    timeoutMs: options.accessoryTimeoutMs ?? 8_000,
+  })))(context.member, budget);
   const recommendations = sortRecommendations(accessoryRecommendations(accessories, budget));
   return {
     uuid: context.uuid,
@@ -315,6 +335,7 @@ export async function nextUpgradesFromContext(context: any, budget: number, opti
     },
     budget,
     status: "estimate",
+    valuation: accessories?.valuation ?? null,
     recommendations,
     sourceFreshness: {
       verifiedAt: VERIFIED_AT,

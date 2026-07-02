@@ -16,6 +16,7 @@ Use this skill for talismans/accessories, Magical Power, accessory-bag state, ne
 - Use `skyblock_accessories` for owned state, active family tiers, duplicates, recombobulation/enrichment signals, ignored duplicates, and MP estimate.
 - Use `skyblock_missing_accessories` for missing accessories, family coverage, unresolved candidates, and cheapest missing candidates.
 - Use `skyblock_accessory_upgrades` for budget-constrained coin-per-MP rankings and buyable upgrade lists.
+- For broad agent passes, bound price fanout with `maxPriceLookups` and `timeoutMs`; request larger limits only when the user explicitly wants a deeper accessory sweep.
 - Use `skyblock_networth` when accessory decisions need full sectioned networth, purse/bank context, unknown prices, or the user's total coin position.
 - Use `skyblock_item_networth` for accessory-bag item networth, sectioned item networth, or when the user asks about one inventory section's coin value.
 - Pair with `skyblock_price` only when inspecting one candidate manually or verifying a surprising candidate price.
@@ -23,6 +24,7 @@ Use this skill for talismans/accessories, Magical Power, accessory-bag state, ne
 ## Rules
 
 - Explain MP as estimated unless exact provider metadata is present.
+- If accessory output is `partial`, treat cheapest-missing and buyable lists as a bounded first pass and preserve limit, timeout, stale-cache, and missing-price warnings.
 - Treat full networth and accessory-bag item networth as conservative because unresolved prices, modifier valuation, and provider confidence can change totals.
 - Do not recommend unresolved, missing-price, or over-budget upgrades as buyable.
 - Carry accessory metadata-provider limitations, provider confidence, fallback chain, and stale-cache warnings into the answer.

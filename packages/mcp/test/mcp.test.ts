@@ -68,6 +68,43 @@ test("context MCP tools are exposed", () => {
   expect(names).toContain("skyagent_objective_delete");
 });
 
+test("valuation-heavy MCP tools expose bounded agent controls", () => {
+  const schemaFor = (name: string) => tools.find((tool) => tool.name === name)?.inputSchema.properties ?? {};
+
+  expect(schemaFor("skyblock_networth")).toMatchObject({
+    maxItems: { type: "number" },
+    timeoutMs: { type: "number" },
+    includeItems: { type: "boolean" },
+  });
+  expect(schemaFor("skyblock_item_networth")).toMatchObject({
+    maxItems: { type: "number" },
+    timeoutMs: { type: "number" },
+    includeItems: { type: "boolean" },
+  });
+  expect(schemaFor("skyblock_accessories")).toMatchObject({
+    maxPriceLookups: { type: "number" },
+    timeoutMs: { type: "number" },
+  });
+  expect(schemaFor("skyblock_missing_accessories")).toMatchObject({
+    maxPriceLookups: { type: "number" },
+    timeoutMs: { type: "number" },
+  });
+  expect(schemaFor("skyblock_accessory_upgrades")).toMatchObject({
+    maxPriceLookups: { type: "number" },
+    timeoutMs: { type: "number" },
+  });
+  expect(schemaFor("skyblock_plan_goal")).toMatchObject({
+    maxItems: { type: "number" },
+    networthTimeoutMs: { type: "number" },
+    maxPriceLookups: { type: "number" },
+    accessoryTimeoutMs: { type: "number" },
+  });
+  expect(schemaFor("skyblock_next_upgrades")).toMatchObject({
+    maxPriceLookups: { type: "number" },
+    accessoryTimeoutMs: { type: "number" },
+  });
+});
+
 test("context get defaults to cached snapshot reads", async () => {
   isolatedSkyAgentHome();
   const fetchedAtMs = Date.now();
