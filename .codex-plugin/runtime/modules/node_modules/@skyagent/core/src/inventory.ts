@@ -132,7 +132,7 @@ function cleanItemName(item: Record<string, unknown>) {
   return display?.Name ?? null;
 }
 
-export function normalizeItemStack(item: unknown, index: number, sourcePath: string, options: { debugRaw?: boolean } = {}, containerId?: string) {
+export function normalizeItemStack(item: unknown, index: number, sourcePath: string, options: { debugRaw?: boolean } = {}, containerId?: string, metadata: Record<string, unknown> = {}) {
   if (!item || typeof item !== "object") {
     return null;
   }
@@ -152,6 +152,7 @@ export function normalizeItemStack(item: unknown, index: number, sourcePath: str
     displayName: cleanItemName(record),
     extraAttributes: extra,
     sourcePath,
+    ...metadata,
     ...(options.debugRaw ? { raw: record } : {}),
   };
 }
@@ -170,11 +171,11 @@ function itemListFromDecoded(decoded: unknown): unknown[] {
   return [];
 }
 
-async function decodeSectionPayload(payload: unknown, sourcePath: string, options: { debugRaw?: boolean }, containerId?: string) {
+async function decodeSectionPayload(payload: unknown, sourcePath: string, options: { debugRaw?: boolean }, containerId?: string, metadata: Record<string, unknown> = {}) {
   const decoded = await decodeHypixelNbt(payload);
   const rawItems = itemListFromDecoded(decoded.simplified);
   const items = rawItems
-    .map((item, index) => normalizeItemStack(item, index, sourcePath, options, containerId))
+    .map((item, index) => normalizeItemStack(item, index, sourcePath, options, containerId, metadata))
     .filter(Boolean);
 
   return {
@@ -269,27 +270,53 @@ function petList(member: any) {
 
 function petItems(member: any, options: { debugRaw?: boolean } = {}) {
   const { pets, sourcePath } = petList(member);
-  return pets.map((pet, index) => ({
-    slot: index,
-    index,
-    containerId: null,
-    itemId: "skyblock:pet",
-    internalId: pet.type ?? null,
-    count: 1,
-    damage: null,
-    displayName: pet.type ?? null,
-    extraAttributes: {
-      type: pet.type ?? null,
-      tier: pet.tier ?? null,
-      exp: pet.exp ?? null,
-      active: pet.active ?? null,
-      heldItem: pet.heldItem ?? null,
+  return pets.map((pet, index) => {
+    const type = pet.type ?? null;
+    const tier = pet.tier ?? pet.rarity ?? null;
+    const displayName = [tier, type].filter(Boolean).join(" ").replace(/_/g, " ") || null;
+    const hasXp = pet.exp !== undefined && pet.exp !== null;
+    const warnings = [{
+      code: "pet_level_formula_unavailable",
+      message: hasXp
+        ? "Pet XP is preserved, but exact pet level is not derived because no maintained pet XP formula provider is bundled."
+        : "Exact pet level is not derived because no pet XP value or maintained pet XP formula provider is bundled.",
+      sourcePath: hasXp ? `${sourcePath}.${index}.exp` : `${sourcePath}.${index}`,
+    }];
+    return {
+      slot: index,
+      index,
+      containerId: null,
+      itemId: "skyblock:pet",
+      internalId: type,
+      petType: type,
+      count: 1,
+      damage: null,
+      displayName,
+      tier,
+      rarity: tier,
+      xp: pet.exp ?? null,
+      level: null,
+      levelSource: null,
+      active: pet.active ?? false,
+      heldItem: pet.heldItem ?? pet.held_item ?? null,
       skin: pet.skin ?? null,
-      candyUsed: pet.candyUsed ?? null,
-    },
-    sourcePath,
-    ...(options.debugRaw ? { raw: pet } : {}),
-  }));
+      candyUsed: pet.candyUsed ?? pet.candy_used ?? null,
+      warnings,
+      extraAttributes: {
+        type,
+        tier,
+        exp: pet.exp ?? null,
+        active: pet.active ?? false,
+        heldItem: pet.heldItem ?? pet.held_item ?? null,
+        skin: pet.skin ?? null,
+        candyUsed: pet.candyUsed ?? pet.candy_used ?? null,
+        level: null,
+        levelSource: null,
+      },
+      sourcePath,
+      ...(options.debugRaw ? { raw: pet } : {}),
+    };
+  });
 }
 
 async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, options: { debugRaw?: boolean }) {
@@ -311,7 +338,13 @@ async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, o
     }
     for (const [index, value] of payload.entries()) {
       try {
-        containers.push(await decodeSectionPayload(value, `${sourcePath}.${index}`, options, String(index)));
+        const armorSlot = armorSlots[index] ?? null;
+        containers.push(await decodeSectionPayload(value, `${sourcePath}.${index}`, options, String(index), {
+          wardrobeSource: "loadout_armor_fallback",
+          current: true,
+          loadoutSlot: null,
+          armorSlot,
+        }));
       } catch (error) {
         warnings.push(warningFromError(error, `${sourcePath}.${index}`));
       }
@@ -347,7 +380,12 @@ async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, o
       }
       const path = `${sourcePath}.${armorSlot}`;
       try {
-        containers.push(await decodeSectionPayload(value, path, options, armorSlot));
+        containers.push(await decodeSectionPayload(value, path, options, armorSlot, {
+          wardrobeSource: "loadout_armor_fallback",
+          current: true,
+          loadoutSlot: null,
+          armorSlot,
+        }));
       } catch (error) {
         warnings.push(warningFromError(error, path));
       }
@@ -367,6 +405,13 @@ async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, o
 
   const entries = Object.entries(payload as Record<string, any>)
     .sort(([left], [right]) => Number(left) - Number(right) || left.localeCompare(right));
+  if (entries.length > 0) {
+    warnings.push({
+      code: "current_loadout_unknown",
+      message: "Loadout armor exposes loadout slots, but the active loadout slot is not identified by this payload.",
+      sourcePath,
+    });
+  }
 
   for (const [loadoutSlot, loadout] of entries) {
     if (!loadout || typeof loadout !== "object") {
@@ -389,7 +434,12 @@ async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, o
       }
       const path = `${sourcePath}.${loadoutSlot}.${armorSlot}`;
       try {
-        containers.push(await decodeSectionPayload(value, path, options, `${loadoutSlot}:${armorSlot}`));
+        containers.push(await decodeSectionPayload(value, path, options, `${loadoutSlot}:${armorSlot}`, {
+          wardrobeSource: "loadout_armor_fallback",
+          current: null,
+          loadoutSlot,
+          armorSlot,
+        }));
       } catch (error) {
         warnings.push(warningFromError(error, path));
       }
@@ -423,7 +473,7 @@ export async function inventorySectionFromMember(member: unknown, sectionName: s
       available: pets.present,
       itemCount: items.length,
       items,
-      warnings: pets.present ? [] : [{ code: "missing_section", message: "No exposed pet data found.", sourcePath: pets.sourcePath }],
+      warnings: pets.present ? items.flatMap((item: any) => item.warnings ?? []) : [{ code: "missing_section", message: "No exposed pet data found.", sourcePath: pets.sourcePath }],
     };
   }
 
@@ -450,12 +500,22 @@ export async function inventorySectionFromMember(member: unknown, sectionName: s
       : definition.container
       ? await decodeContainerSection(value, path, options)
       : await decodeSectionPayload(value, path, options);
+    const wardrobeMetadata = normalized === "wardrobe"
+      ? path === "loadout.armor"
+        ? { sourceKind: "loadout_armor_fallback", currentLoadoutFallback: true }
+        : { sourceKind: "wardrobe_contents", currentLoadoutFallback: false }
+      : {};
+    const items = normalized === "wardrobe" && path !== "loadout.armor"
+      ? (decoded.items ?? []).map((item: any) => ({ ...item, wardrobeSource: "wardrobe_contents", current: false }))
+      : decoded.items;
     return {
       section: definition.name,
       label: definition.label,
       available: true,
       warnings: [],
       ...decoded,
+      ...wardrobeMetadata,
+      items,
     };
   } catch (error) {
     return {

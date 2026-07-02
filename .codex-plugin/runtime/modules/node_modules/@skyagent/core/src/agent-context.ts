@@ -16,6 +16,7 @@ function compactWarnings(warnings: any[] = [], limit = 25) {
 
 const PARTIAL_WARNING_CODES = new Set([
   "partial_loadout_armor",
+  "current_loadout_unknown",
   "unsupported_section_shape",
   "inventory_section_error",
   "nbt_decode_error",
@@ -68,6 +69,10 @@ function compactItems(section: any, limit = 8) {
     internalId: item.internalId ?? item.id ?? null,
     count: item.count ?? 1,
     rarity: item.rarity ?? null,
+    armorSlot: item.armorSlot ?? null,
+    loadoutSlot: item.loadoutSlot ?? null,
+    wardrobeSource: item.wardrobeSource ?? section.sourceKind ?? null,
+    current: item.current ?? null,
     sourcePath: item.sourcePath ?? section.sourcePath ?? null,
   }));
 }
@@ -79,6 +84,8 @@ function sectionSummary(section: any, limit = 8) {
     available: Boolean(section?.available),
     itemCount: section?.itemCount ?? 0,
     sourcePath: section?.sourcePath ?? null,
+    sourceKind: section?.sourceKind ?? null,
+    currentLoadoutFallback: section?.currentLoadoutFallback ?? false,
     freshness: sectionFreshness(status, "profile", null),
     items: compactItems(section, limit),
     warnings: compactWarnings(section?.warnings ?? [], 8),
@@ -86,19 +93,26 @@ function sectionSummary(section: any, limit = 8) {
 }
 
 function compactPetItems(section: any, limit = 8) {
-  return [...(section?.items ?? [])]
+  const sorted = [...(section?.items ?? [])]
     .sort((left: any, right: any) => {
-      const activeDelta = Number(Boolean(right.extraAttributes?.active)) - Number(Boolean(left.extraAttributes?.active));
-      return activeDelta || Number(right.extraAttributes?.exp ?? 0) - Number(left.extraAttributes?.exp ?? 0);
-    })
-    .slice(0, limit)
+      const leftActive = Boolean(left.active ?? left.extraAttributes?.active);
+      const rightActive = Boolean(right.active ?? right.extraAttributes?.active);
+      const activeDelta = Number(rightActive) - Number(leftActive);
+      return activeDelta || Number(right.xp ?? right.extraAttributes?.exp ?? 0) - Number(left.xp ?? left.extraAttributes?.exp ?? 0);
+    });
+  return sorted.slice(0, limit)
     .map((item: any) => ({
       name: item.displayName ?? item.internalId ?? "Unknown pet",
       internalId: item.internalId ?? null,
       tier: item.extraAttributes?.tier ?? null,
-      exp: item.extraAttributes?.exp ?? null,
-      active: item.extraAttributes?.active ?? null,
-      heldItem: item.extraAttributes?.heldItem ?? null,
+      xp: item.xp ?? item.extraAttributes?.exp ?? null,
+      level: item.level ?? item.extraAttributes?.level ?? null,
+      levelSource: item.levelSource ?? item.extraAttributes?.levelSource ?? null,
+      active: item.active ?? item.extraAttributes?.active ?? null,
+      heldItem: item.heldItem ?? item.extraAttributes?.heldItem ?? null,
+      skin: item.skin ?? item.extraAttributes?.skin ?? null,
+      candyUsed: item.candyUsed ?? item.extraAttributes?.candyUsed ?? null,
+      warningCount: (item.warnings ?? []).length,
       sourcePath: item.sourcePath ?? section.sourcePath ?? null,
     }));
 }
@@ -111,6 +125,8 @@ function petSummary(section: any, limit = 8) {
     available: Boolean(section?.available),
     itemCount: section?.itemCount ?? 0,
     sourcePath: section?.sourcePath ?? null,
+    sourceKind: section?.sourceKind ?? null,
+    currentLoadoutFallback: section?.currentLoadoutFallback ?? false,
     freshness: sectionFreshness(status, "profile", null),
     activePet: items.find((item: any) => item.active) ?? null,
     items,

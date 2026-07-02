@@ -176,10 +176,37 @@ describe("inventory extraction", () => {
 
     expect(section.available).toBe(true);
     expect(section.sourcePath).toBe("loadout.armor");
+    expect((section as any).sourceKind).toBe("loadout_armor_fallback");
+    expect((section as any).currentLoadoutFallback).toBe(true);
     expect(section.itemCount).toBe(4);
     expect(section.items.map((stack) => stack.containerId)).toEqual(["1:HELMET", "1:CHESTPLATE", "1:LEGGINGS", "1:BOOTS"]);
+    expect(section.items.map((stack) => stack.loadoutSlot)).toEqual(["1", "1", "1", "1"]);
     expect(section.items.map((stack) => stack.internalId)).toEqual(["NECRON_HELMET", "NECRON_CHESTPLATE", "NECRON_LEGGINGS", "NECRON_BOOTS"]);
-    expect(section.warnings).toEqual([]);
+    expect(section.items[0]).toMatchObject({
+      wardrobeSource: "loadout_armor_fallback",
+      current: null,
+      loadoutSlot: "1",
+      armorSlot: "HELMET",
+    });
+    expect(section.warnings).toContainEqual(expect.objectContaining({ code: "current_loadout_unknown" }));
+  });
+
+  test("extracts direct wardrobe payloads as true wardrobe contents", async () => {
+    const section = await inventorySectionFromMember({
+      inventory: {
+        wardrobe_contents: { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+      },
+    }, "wardrobe");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("inventory.wardrobe_contents");
+    expect((section as any).sourceKind).toBe("wardrobe_contents");
+    expect((section as any).currentLoadoutFallback).toBe(false);
+    expect(section.items[0]).toMatchObject({
+      internalId: "NECRON_HELMET",
+      wardrobeSource: "wardrobe_contents",
+      current: false,
+    });
   });
 
   test("extracts direct loadout armor piece maps as wardrobe data", async () => {
@@ -197,6 +224,7 @@ describe("inventory extraction", () => {
     expect(section.available).toBe(true);
     expect(section.itemCount).toBe(4);
     expect(section.items.map((stack) => stack.containerId)).toEqual(["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"]);
+    expect(section.items.map((stack) => stack.armorSlot)).toEqual(["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"]);
     expect(section.warnings).toEqual([]);
   });
 
@@ -215,6 +243,8 @@ describe("inventory extraction", () => {
     expect(section.available).toBe(true);
     expect(section.itemCount).toBe(4);
     expect(section.items.map((stack) => stack.containerId)).toEqual(["0", "1", "2", "3"]);
+    expect(section.items.map((stack) => stack.loadoutSlot)).toEqual([null, null, null, null]);
+    expect(section.items.map((stack) => stack.armorSlot)).toEqual(["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"]);
     expect(section.warnings).toEqual([]);
   });
 
@@ -279,11 +309,47 @@ describe("inventory extraction", () => {
     expect(section.itemCount).toBe(1);
     expect(section.items[0]).toMatchObject({
       internalId: "GOLDEN_DRAGON",
+      petType: "GOLDEN_DRAGON",
+      displayName: "LEGENDARY GOLDEN DRAGON",
+      tier: "LEGENDARY",
+      rarity: "LEGENDARY",
+      xp: 1_000_000,
+      level: null,
+      levelSource: null,
+      active: true,
+      heldItem: "PET_ITEM_TIER_BOOST",
       sourcePath: "pets_data.pets",
       extraAttributes: {
         tier: "LEGENDARY",
         heldItem: "PET_ITEM_TIER_BOOST",
       },
+    });
+    expect(section.warnings).toContainEqual(expect.objectContaining({
+      code: "pet_level_formula_unavailable",
+      sourcePath: "pets_data.pets.0.exp",
+    }));
+  });
+
+  test("extracts legacy pet records with stable fields", async () => {
+    const section = await inventorySectionFromMember({
+      pets: [
+        { type: "ROCK", tier: "RARE", exp: 10, active: false, held_item: "PET_ITEM_IRON_CLAWS", skin: "COBBLESTONE", candy_used: 1 },
+      ],
+    }, "pets");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("pets");
+    expect(section.items[0]).toMatchObject({
+      internalId: "ROCK",
+      petType: "ROCK",
+      displayName: "RARE ROCK",
+      tier: "RARE",
+      xp: 10,
+      active: false,
+      heldItem: "PET_ITEM_IRON_CLAWS",
+      skin: "COBBLESTONE",
+      candyUsed: 1,
+      level: null,
     });
   });
 
