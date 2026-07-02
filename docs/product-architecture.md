@@ -6,7 +6,7 @@ SkyAgent is a local-first product with one installed command, `skyagent`, and se
 
 Packages:
 
-- `packages/core`: Hypixel clients, profile models, config, cache, item/economy/progression/planning logic.
+- `packages/core`: Hypixel clients, profile models, config, cache, item/economy/progression/planning logic, and the LiteLLM-backed LLM gateway contract.
 - `packages/gateway`: localhost HTTP/WebSocket backend over `core`.
 - `packages/cli`: installed `skyagent` command, process manager, setup, updater, non-interactive commands.
 - `packages/tui`: Ink UI that talks to the gateway.
@@ -62,6 +62,7 @@ Human workflow commands:
 ```text
 skyagent setup
 skyagent doctor
+skyagent provider status|config
 skyagent tui
 skyagent gateway start|stop|restart|status|logs
 skyagent web start|stop|restart|status|open
@@ -104,7 +105,45 @@ GET  /server-status?player=
 GET  /context/events?since=&limit=
 POST /context/events
 GET  /context/stream?since=&limit=
+GET  /llm-provider/status
+GET  /llm-provider/config
+POST /llm-provider/config
 ```
+
+## LLM Provider Gateway Contract
+
+SkyAgent's product agent runtime is provider-gateway based. It must not shell out to `codex`, `codex exec`, or the Codex CLI session/config store. Codex may be used to develop and review this repository, but runtime agent integration belongs behind SkyAgent's LiteLLM gateway boundary.
+
+LiteLLM is the SkyAgent provider abstraction. The core contract resolves local LiteLLM config and environment overrides, redacts secrets, performs health/status checks, captures provider freshness, maps gateway errors, applies timeout/retry limits, and exposes OpenAI-compatible chat completions and Responses streaming events to agent-facing code.
+
+Local config:
+
+```text
+skyagent provider config set provider litellm
+skyagent provider config set base-url http://127.0.0.1:4000
+skyagent provider config set model skyagent-codex
+skyagent provider config set api-key <virtual-key>
+skyagent provider config set rate-limit-rpm 60
+skyagent provider config set rate-limit-tpm 120000
+skyagent provider config set budget-usd 5
+skyagent provider config set budget-window daily
+skyagent provider status --json
+```
+
+Environment overrides:
+
+```text
+SKYAGENT_LLM_PROVIDER=litellm
+SKYAGENT_LITELLM_BASE_URL=http://127.0.0.1:4000
+SKYAGENT_LLM_MODEL=skyagent-codex
+SKYAGENT_LITELLM_API_KEY=<virtual-key>
+SKYAGENT_LLM_TIMEOUT_MS=30000
+SKYAGENT_LLM_MAX_RETRIES=1
+```
+
+The HTTP gateway may update non-secret provider config and metadata, but it must not persist provider API keys. Provider API keys are configured through environment variables, direct CLI, or MCP tool calls where the local user/agent explicitly supplies the secret.
+
+Concrete model providers must be configured behind LiteLLM rather than added as parallel SkyAgent runtime backends. Agent runtime code should depend on the SkyAgent LiteLLM gateway contract: resolved config, redacted public config, health/status metadata, auth-source reporting, configured and observed budget/rate-limit metadata, streamed `text_delta` and tool-call events, and explicit retryable/non-retryable errors.
 
 ## Context Event Contract
 

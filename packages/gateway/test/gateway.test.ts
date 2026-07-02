@@ -28,7 +28,7 @@ test("health is public and version requires gateway token", async () => {
 });
 
 test("config routes redact secrets and reject unknown keys", async () => {
-  const values: Record<string, unknown> = {};
+  const values: Record<string, any> = {};
   const gateway = createGateway({
     token: "test-token",
     deps: {
@@ -69,6 +69,118 @@ test("config routes redact secrets and reject unknown keys", async () => {
   }));
   expect(invalid.status).toBe(400);
   expect(values.username).toBe("Notch");
+});
+
+test("LLM provider routes expose redacted config and authenticated status", async () => {
+  const values: Record<string, any> = {};
+  const gateway = createGateway({
+    token: "test-token",
+    deps: {
+      publicLlmProviderConfig: () => ({
+        provider: values.provider ?? null,
+        configured: Boolean(values.provider && values.baseUrl && values.model),
+        baseUrl: values.baseUrl ? "http://localhost:4000" : null,
+        model: values.model ?? null,
+        timeoutMs: 30_000,
+        maxRetries: 1,
+        auth: { apiKeyConfigured: Boolean(values.apiKey), apiKeySource: values.apiKey ? "config" : null },
+        configuredRateLimit: { requestsPerMinute: values.requestsPerMinute ?? null, tokensPerMinute: values.tokensPerMinute ?? null },
+        configuredBudget: { maxUsd: values.maxUsd ?? null, window: values.window ?? null },
+        warnings: [],
+      }),
+      setLlmProviderConfigValue: (key, value) => {
+        values[key] = value;
+        if (key === "base-url") values.baseUrl = value;
+        if (key === "rate-limit-rpm") values.requestsPerMinute = Number(value);
+        if (key === "rate-limit-tpm") values.tokensPerMinute = Number(value);
+        if (key === "budget-usd") values.maxUsd = Number(value);
+        if (key === "budget-window") values.window = value;
+        return {
+          provider: values.provider ?? null,
+          configured: Boolean(values.provider && values.baseUrl && values.model),
+          baseUrl: values.baseUrl ? "http://localhost:4000" : null,
+          model: values.model ?? null,
+          timeoutMs: 30_000,
+          maxRetries: 1,
+          auth: { apiKeyConfigured: Boolean(values.apiKey), apiKeySource: values.apiKey ? "config" : null },
+          configuredRateLimit: { requestsPerMinute: values.requestsPerMinute ?? null, tokensPerMinute: values.tokensPerMinute ?? null },
+          configuredBudget: { maxUsd: values.maxUsd ?? null, window: values.window ?? null },
+          warnings: [],
+        };
+      },
+      llmProviderStatus: async () => ({
+        kind: "skyagent.llmProviderStatus",
+        schemaVersion: 1,
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        provider: "litellm",
+        configured: true,
+        model: "skyagent-codex",
+        baseUrl: "http://localhost:4000",
+        auth: { apiKeyConfigured: true, apiKeySource: "config" },
+        timeoutMs: 30_000,
+        maxRetries: 1,
+        health: { checked: true, ok: true, status: 200, url: "http://localhost:4000/health", error: null },
+        rateLimit: { "x-ratelimit-remaining-requests": "50" },
+        budget: { "x-litellm-key-spend": "0.1" },
+        configuredRateLimit: { requestsPerMinute: 60, tokensPerMinute: 12000 },
+        configuredBudget: { maxUsd: 5, window: "daily" },
+        warnings: [],
+      }),
+    },
+  });
+
+  const unauthorized = await gateway.handle(request("/llm-provider/status"));
+  expect(unauthorized.status).toBe(401);
+
+  const updated = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ provider: "litellm", "base-url": "http://localhost:4000", model: "skyagent-codex", "rate-limit-rpm": "60", "rate-limit-tpm": "12000", "budget-usd": "5", "budget-window": "daily" }),
+  })).then((response) => response.json());
+  expect(updated.config).toMatchObject({
+    provider: "litellm",
+    configured: true,
+    configuredRateLimit: { requestsPerMinute: 60, tokensPerMinute: 12000 },
+    configuredBudget: { maxUsd: 5, window: "daily" },
+  });
+
+  const secretWrite = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ "api-key": "secret-key" }),
+  }));
+  expect(secretWrite.status).toBe(400);
+
+  const credentialedBaseUrl = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ "base-url": "http://user:secret@localhost:4000" }),
+  }));
+  expect(credentialedBaseUrl.status).toBe(400);
+
+  const secretQueryBaseUrl = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ baseUrl: "http://localhost:4000?token=secret" }),
+  }));
+  expect(secretQueryBaseUrl.status).toBe(400);
+
+  const malformedBaseUrl = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ "base-url": "not a url" }),
+  }));
+  expect(malformedBaseUrl.status).toBe(400);
+
+  const status = await gateway.handle(request("/llm-provider/status", "test-token")).then((response) => response.json());
+  expect(status.provider).toMatchObject({
+    provider: "litellm",
+    health: { ok: true },
+    budget: { "x-litellm-key-spend": "0.1" },
+    configuredRateLimit: { requestsPerMinute: 60, tokensPerMinute: 12000 },
+    configuredBudget: { maxUsd: 5, window: "daily" },
+  });
+
+  const invalid = await gateway.handle(request("/llm-provider/config", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ unknown: "value" }),
+  }));
+  expect(invalid.status).toBe(400);
 });
 
 test("profiles and overview routes use injected core contracts", async () => {
@@ -319,6 +431,9 @@ test("gateway client exposes analysis route helpers", async () => {
   await client.plan("f7", "Notch", "Apple", 2000);
   await client.nextUpgrades(3000, "Notch", "Apple");
   await client.providerStatus();
+  await client.llmProviderStatus();
+  await client.llmProviderConfig();
+  await client.setLlmProviderConfig({ provider: "litellm" });
   await client.resource("items");
 
   expect(paths).toContain("/inventory-section?section=armor&player=Notch&profile=Apple");
@@ -329,6 +444,8 @@ test("gateway client exposes analysis route helpers", async () => {
   expect(paths).toContain("/context/events");
   expect(paths).toContain("/items/metadata?id=ASPECT_OF_THE_END");
   expect(paths).toContain("/provider-status");
+  expect(paths).toContain("/llm-provider/status");
+  expect(paths).toContain("/llm-provider/config");
   expect(paths).toContain("/resource?kind=items");
 });
 

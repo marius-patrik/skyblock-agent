@@ -5,6 +5,7 @@ import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesFor
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { llmProviderStatus, publicLlmProviderConfig, setLlmProviderConfigValue } from "@skyagent/core/llm-provider";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
@@ -28,6 +29,29 @@ export const tools = [
       type: "object",
       properties: {
         key: { type: "string", enum: ["username", "uuid", "profile", "api-key"] },
+        value: { type: "string" },
+      },
+      required: ["key", "value"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_llm_provider_status",
+    description: "Return SkyAgent LLM provider status for the LiteLLM/OpenAI-compatible gateway without revealing provider secrets.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyagent_llm_provider_config_get",
+    description: "Read SkyAgent LLM provider config metadata without revealing LiteLLM virtual keys or endpoint auth material.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyagent_llm_provider_config_set",
+    description: "Store SkyAgent LLM provider config for LiteLLM/OpenAI-compatible routing. Secrets are redacted from the response.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: { type: "string", enum: ["provider", "base-url", "model", "api-key", "timeout-ms", "max-retries", "rate-limit-rpm", "rate-limit-tpm", "budget-usd", "budget-window"] },
         value: { type: "string" },
       },
       required: ["key", "value"],
@@ -734,6 +758,12 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       return publicConfig();
     case "skyagent_config_set":
       return setConfigValue(configKeyMap[args.key], args.value);
+    case "skyagent_llm_provider_status":
+      return llmProviderStatus();
+    case "skyagent_llm_provider_config_get":
+      return publicLlmProviderConfig();
+    case "skyagent_llm_provider_config_set":
+      return setLlmProviderConfigValue(args.key, args.value);
     case "skyagent_memory_add":
       return addMemory({ text: args.text, tags: args.tags ?? [], source: "mcp" });
     case "skyagent_memory_list":

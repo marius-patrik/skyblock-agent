@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
+import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
 import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
@@ -15,6 +16,10 @@ afterEach(() => {
     tempHome = null;
   }
   delete process.env.SKYAGENT_HOME;
+  delete process.env.SKYAGENT_LITELLM_API_KEY;
+  delete process.env.SKYAGENT_LITELLM_BASE_URL;
+  delete process.env.SKYAGENT_LLM_MODEL;
+  delete process.env.SKYAGENT_LLM_PROVIDER;
 });
 
 function isolatedSkyAgentHome() {
@@ -282,6 +287,33 @@ describe("CLI argument parsing", () => {
     isolatedSkyAgentHome();
 
     await command(["setup", "--json"]);
+  });
+
+  test("provider config and status commands redact LiteLLM secrets", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["provider", "config", "set", "provider", "litellm", "--json"]);
+    await command(["provider", "config", "set", "base-url", "http://user:pass@localhost:4000?token=abc", "--json"]);
+    await command(["provider", "config", "set", "model", "skyagent-codex", "--json"]);
+    await command(["provider", "config", "set", "api-key", "sk-secret", "--json"]);
+    await command(["provider", "config", "set", "rate-limit-rpm", "60", "--json"]);
+    await command(["provider", "config", "set", "rate-limit-tpm", "12000", "--json"]);
+    await command(["provider", "config", "set", "budget-usd", "5", "--json"]);
+    await command(["provider", "config", "set", "budget-window", "daily", "--json"]);
+    await command(["provider", "config", "get", "--json"]);
+    await command(["provider", "status", "--json"]);
+
+    const config = publicLlmProviderConfig();
+    expect(config).toMatchObject({
+      provider: "litellm",
+      configured: true,
+      model: "skyagent-codex",
+      auth: { apiKeyConfigured: true, apiKeySource: "config" },
+      configuredRateLimit: { requestsPerMinute: 60, tokensPerMinute: 12000 },
+      configuredBudget: { maxUsd: 5, window: "daily" },
+    });
+    expect(JSON.stringify(config)).not.toContain("sk-secret");
+    expect(config.baseUrl).toContain("redacted");
   });
 
   test("version and doctor commands report install diagnostics", async () => {

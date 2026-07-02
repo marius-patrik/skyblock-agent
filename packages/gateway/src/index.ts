@@ -12,6 +12,7 @@ import {
   inventorySectionForPlayer,
   itemMetadata,
   itemNetworthForPlayer,
+  llmProviderStatus,
   missingAccessoriesForPlayer,
   networthForPlayer,
   nextUpgradesForPlayer,
@@ -20,12 +21,14 @@ import {
   profileSectionForPlayer,
   profileSummaries,
   progressionForPlayer,
+  publicLlmProviderConfig,
   providerStatus,
   publicConfig,
   readContextEvents,
   readinessForPlayer,
   resourceEndpoint,
   serverStatusForPlayer,
+  setLlmProviderConfigValue,
   setConfigValue,
   subscribeContextEvents,
   skyblockProfiles,
@@ -47,6 +50,7 @@ type GatewayDeps = {
   itemMetadata: typeof itemMetadata;
   networthForPlayer: typeof networthForPlayer;
   itemNetworthForPlayer: typeof itemNetworthForPlayer;
+  llmProviderStatus: typeof llmProviderStatus;
   accessoriesForPlayer: typeof accessoriesForPlayer;
   missingAccessoriesForPlayer: typeof missingAccessoriesForPlayer;
   accessoryUpgradesForPlayer: typeof accessoryUpgradesForPlayer;
@@ -58,6 +62,8 @@ type GatewayDeps = {
   nextUpgradesForPlayer: typeof nextUpgradesForPlayer;
   hypixelRequest: typeof hypixelRequest;
   resourceEndpoint: typeof resourceEndpoint;
+  publicLlmProviderConfig: typeof publicLlmProviderConfig;
+  setLlmProviderConfigValue: typeof setLlmProviderConfigValue;
   providerStatus: typeof providerStatus;
   agentContextForPlayer: (...args: Parameters<typeof agentContextForPlayer>) => Promise<any>;
   serverStatusForPlayer: (...args: Parameters<typeof serverStatusForPlayer>) => Promise<any>;
@@ -93,6 +99,7 @@ const defaultDeps: GatewayDeps = {
   itemMetadata,
   networthForPlayer,
   itemNetworthForPlayer,
+  llmProviderStatus,
   accessoriesForPlayer,
   missingAccessoriesForPlayer,
   accessoryUpgradesForPlayer,
@@ -104,6 +111,8 @@ const defaultDeps: GatewayDeps = {
   nextUpgradesForPlayer,
   hypixelRequest,
   resourceEndpoint,
+  publicLlmProviderConfig,
+  setLlmProviderConfigValue,
   providerStatus,
   agentContextForPlayer,
   serverStatusForPlayer,
@@ -166,6 +175,31 @@ async function parseJsonBody(request: Request) {
     return {};
   }
   return JSON.parse(text);
+}
+
+function validateNonSecretProviderBaseUrl(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") {
+    return { code: "invalid_llm_provider_base_url", message: "LLM provider base URL must be a string." };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { code: "invalid_llm_provider_base_url", message: "LLM provider base URL must be a valid URL." };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { code: "invalid_llm_provider_base_url", message: "LLM provider base URL must use http or https." };
+  }
+  if (url.username || url.password) {
+    return { code: "llm_provider_secret_write_disallowed", message: "Do not include credentials in LLM provider base URLs written through the HTTP gateway." };
+  }
+  for (const key of url.searchParams.keys()) {
+    if (/key|token|secret|auth|password/i.test(key)) {
+      return { code: "llm_provider_secret_write_disallowed", message: "Do not include secret-like query parameters in LLM provider base URLs written through the HTTP gateway." };
+    }
+  }
+  return null;
 }
 
 export function createGateway(options: GatewayOptions = {}) {
@@ -390,6 +424,39 @@ export function createGateway(options: GatewayOptions = {}) {
         return json({ ok: true, providers });
       }
 
+      if (url.pathname === "/llm-provider/status" && request.method === "GET") {
+        return json({ ok: true, provider: await deps.llmProviderStatus() });
+      }
+
+      if (url.pathname === "/llm-provider/config" && request.method === "GET") {
+        return json({ ok: true, config: deps.publicLlmProviderConfig() });
+      }
+
+      if (url.pathname === "/llm-provider/config" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const secretKeys = new Set(["api-key", "apiKey"]);
+        const allowed = new Set(["provider", "base-url", "baseUrl", "model", "timeout-ms", "timeoutMs", "max-retries", "maxRetries", "rate-limit-rpm", "rate-limit-tpm", "budget-usd", "budget-window"]);
+        for (const key of Object.keys(body)) {
+          if (secretKeys.has(key)) {
+            return errorResponse(400, "llm_provider_secret_write_disallowed", "Set LLM provider API keys through environment variables, CLI, or MCP; the HTTP gateway does not persist provider secrets.");
+          }
+          if (!allowed.has(key)) {
+            return errorResponse(400, "invalid_llm_provider_config_key", `Unsupported LLM provider config key: ${key}`);
+          }
+          if (key === "base-url" || key === "baseUrl") {
+            const invalidBaseUrl = validateNonSecretProviderBaseUrl(body[key]);
+            if (invalidBaseUrl) {
+              return errorResponse(400, invalidBaseUrl.code, invalidBaseUrl.message);
+            }
+          }
+        }
+        let config = deps.publicLlmProviderConfig();
+        for (const [key, value] of Object.entries(body)) {
+          config = deps.setLlmProviderConfigValue(key, value);
+        }
+        return json({ ok: true, config });
+      }
+
       if (url.pathname === "/resource" && request.method === "GET") {
         const kind = query(url, "kind");
         if (!kind) return errorResponse(400, "missing_resource_kind", "Query parameter kind is required.");
@@ -596,6 +663,21 @@ export class GatewayClient {
 
   providerStatus() {
     return this.request("/provider-status");
+  }
+
+  llmProviderStatus() {
+    return this.request("/llm-provider/status");
+  }
+
+  llmProviderConfig() {
+    return this.request("/llm-provider/config");
+  }
+
+  setLlmProviderConfig(config: Record<string, unknown>) {
+    return this.request("/llm-provider/config", {
+      method: "POST",
+      body: JSON.stringify(config),
+    });
   }
 
   resource(kind: string) {

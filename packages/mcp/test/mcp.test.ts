@@ -14,6 +14,10 @@ afterEach(() => {
     tempHome = null;
   }
   delete process.env.SKYAGENT_HOME;
+  delete process.env.SKYAGENT_LITELLM_API_KEY;
+  delete process.env.SKYAGENT_LITELLM_BASE_URL;
+  delete process.env.SKYAGENT_LLM_MODEL;
+  delete process.env.SKYAGENT_LLM_PROVIDER;
 });
 
 function isolatedSkyAgentHome() {
@@ -61,11 +65,41 @@ test("context MCP tools are exposed", () => {
   expect(names).toContain("skyagent_context_events");
   expect(names).toContain("skyagent_context_watch");
   expect(names).toContain("skyagent_context_event_emit");
+  expect(names).toContain("skyagent_llm_provider_status");
+  expect(names).toContain("skyagent_llm_provider_config_get");
+  expect(names).toContain("skyagent_llm_provider_config_set");
   expect(names).toContain("skyagent_objective_create");
   expect(names).toContain("skyagent_objective_list");
   expect(names).toContain("skyagent_objective_update");
   expect(names).toContain("skyagent_objective_complete");
   expect(names).toContain("skyagent_objective_delete");
+});
+
+test("LLM provider MCP tools store redacted LiteLLM config", async () => {
+  isolatedSkyAgentHome();
+
+  await callTool("skyagent_llm_provider_config_set", { key: "provider", value: "litellm" });
+  await callTool("skyagent_llm_provider_config_set", { key: "base-url", value: "http://user:pass@localhost:4000?token=abc" });
+  await callTool("skyagent_llm_provider_config_set", { key: "model", value: "skyagent-codex" });
+  await callTool("skyagent_llm_provider_config_set", { key: "rate-limit-rpm", value: "60" });
+  await callTool("skyagent_llm_provider_config_set", { key: "rate-limit-tpm", value: "12000" });
+  await callTool("skyagent_llm_provider_config_set", { key: "budget-usd", value: "5" });
+  await callTool("skyagent_llm_provider_config_set", { key: "budget-window", value: "daily" });
+  const updated = await callTool("skyagent_llm_provider_config_set", { key: "api-key", value: "sk-secret" });
+  const config = await callTool("skyagent_llm_provider_config_get", {});
+  const status = await callTool("skyagent_llm_provider_status", {});
+
+  expect(updated).toMatchObject({ provider: "litellm", configured: true, auth: { apiKeyConfigured: true } });
+  expect(config).toMatchObject({
+    provider: "litellm",
+    configured: true,
+    model: "skyagent-codex",
+    configuredRateLimit: { requestsPerMinute: 60, tokensPerMinute: 12000 },
+    configuredBudget: { maxUsd: 5, window: "daily" },
+  });
+  expect(status).toMatchObject({ kind: "skyagent.llmProviderStatus", provider: "litellm", configured: true });
+  expect(JSON.stringify({ updated, config, status })).not.toContain("sk-secret");
+  expect(config.baseUrl).toContain("redacted");
 });
 
 test("valuation-heavy MCP tools expose bounded agent controls", () => {

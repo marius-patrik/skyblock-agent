@@ -10,6 +10,7 @@ import { DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS, DEFAULT_ACCESSORY_TIMEOUT_MS, acce
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { llmProviderStatus, publicLlmProviderConfig, setLlmProviderConfigValue } from "@skyagent/core/llm-provider";
 import { DEFAULT_NETWORTH_INCLUDE_ITEMS, DEFAULT_NETWORTH_MAX_ITEMS, DEFAULT_NETWORTH_TIMEOUT_MS, itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
@@ -44,6 +45,9 @@ Usage:
   skyagent config set api-key <key>
   skyagent setup [--json] [--username <name>] [--api-key <key>] [--profile <profileIdOrName>] [--no-write]
   skyagent setup status [--json]
+  skyagent provider status [--json]
+  skyagent provider config get [--json]
+  skyagent provider config set <provider|base-url|model|api-key|timeout-ms|max-retries|rate-limit-rpm|rate-limit-tpm|budget-usd|budget-window> <value> [--json]
   skyagent version [--json]
   skyagent doctor [--json]
   skyagent context [nameOrUuid] [profileIdOrName] [--cache-only] [--allow-stale] [--ttl-ms <ms>]  # cached read
@@ -115,6 +119,7 @@ Usage:
   skyagent memory delete <id>
 
 Secrets are read from HYPIXEL_API_KEY first, then the user config file.
+LLM provider secrets are read from SKYAGENT_LITELLM_API_KEY first, then the SkyAgent user config file.
 `);
 }
 
@@ -530,6 +535,34 @@ export async function command(args) {
       write: !inputs.noWrite,
     }), !compact);
     return;
+  }
+
+  if (area === "provider") {
+    const args = [action, ...rest].filter(Boolean);
+    const compact = args.includes("--json");
+    if (action === "status") {
+      print(await llmProviderStatus(), !compact);
+      return;
+    }
+    if (action === "config") {
+      const [configAction, ...configRest] = rest;
+      const configArgs = [configAction, ...configRest].filter(Boolean);
+      const configCompact = configArgs.includes("--json");
+      if (configAction === "get") {
+        print(publicLlmProviderConfig(), !configCompact);
+        return;
+      }
+      if (configAction === "set") {
+        const values = configRest.filter((arg) => arg !== "--json");
+        const [key, ...valueParts] = values;
+        if (!key) {
+          throw new Error("Usage: skyagent provider config set <provider|base-url|model|api-key|timeout-ms|max-retries|rate-limit-rpm|rate-limit-tpm|budget-usd|budget-window> <value>");
+        }
+        print(setLlmProviderConfigValue(key, valueParts.join(" ")), !configCompact);
+        return;
+      }
+    }
+    throw new Error("Usage: skyagent provider status|config get|config set");
   }
 
   if (area === "version") {

@@ -13,7 +13,7 @@ The goal is to connect Codex to live player data, game reference data, and curat
 
 - `skills/` contains durable SkyBlock reasoning rules and source-priority guidance.
 - `.mcp.json` exposes local tools for Hypixel API calls, profile data, public SkyBlock resources, and persistent SkyAgent notes.
-- `packages/core` contains shared Hypixel/Mojang API clients, profile helpers, config, memories, and future parsers/calculators.
+- `packages/core` contains shared Hypixel/Mojang API clients, profile helpers, config, memories, LLM provider routing, and parsers/calculators.
 - `packages/cli` contains the Bun-powered JSON CLI command implementation.
 - `packages/mcp` contains the Bun-powered MCP server used by Codex.
 - `packages/tui` contains the future interactive terminal UI surface and depends on `@skyagent/core`.
@@ -41,12 +41,42 @@ SkyAgent stores config and memories outside the repo:
 - Windows default: `%APPDATA%\skyagent`
 - Override: `SKYAGENT_HOME`
 
+## LiteLLM Provider Gateway
+
+SkyAgent's product agent runtime is provider-gateway based. It must not shell out to the Codex CLI as its backend. LiteLLM is the SkyAgent LLM abstraction boundary: SkyAgent talks to the local LiteLLM/OpenAI-compatible gateway, and concrete model/provider routing lives behind LiteLLM.
+
+Configure a local LiteLLM proxy:
+
+```powershell
+bun .\scripts\skyagent.ts provider config set provider litellm
+bun .\scripts\skyagent.ts provider config set base-url http://127.0.0.1:4000
+bun .\scripts\skyagent.ts provider config set model skyagent-codex
+bun .\scripts\skyagent.ts provider config set api-key sk-local-virtual-key
+bun .\scripts\skyagent.ts provider config set rate-limit-rpm 60
+bun .\scripts\skyagent.ts provider config set rate-limit-tpm 120000
+bun .\scripts\skyagent.ts provider config set budget-usd 5
+bun .\scripts\skyagent.ts provider config set budget-window daily
+bun .\scripts\skyagent.ts provider status --json
+```
+
+Environment variables override stored provider config when present:
+
+```powershell
+$env:SKYAGENT_LLM_PROVIDER = "litellm"
+$env:SKYAGENT_LITELLM_BASE_URL = "http://127.0.0.1:4000"
+$env:SKYAGENT_LLM_MODEL = "skyagent-codex"
+$env:SKYAGENT_LITELLM_API_KEY = "sk-local-virtual-key"
+```
+
+Provider status redacts tokens and auth material. The HTTP gateway can write non-secret provider metadata, but provider API keys must be set through environment variables, CLI, or MCP. SkyAgent-side agent code should depend on the LiteLLM gateway contract: resolved config, redacted public config, health/status metadata, configured budget/rate-limit metadata, OpenAI-compatible chat completions and Responses streaming events, timeout/retry behavior, and explicit provider freshness/errors. Provider-specific adapters, keys, model aliases, and routing policy belong in LiteLLM.
+
 ## CLI Examples
 
 ```powershell
 bun .\scripts\skyagent.ts version
 bun .\scripts\skyagent.ts doctor
 bun .\scripts\skyagent.ts config get
+bun .\scripts\skyagent.ts provider status
 bun .\scripts\skyagent.ts resolve YourMinecraftName
 bun .\scripts\skyagent.ts profiles
 bun .\scripts\skyagent.ts profiles-summary

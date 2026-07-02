@@ -4,6 +4,32 @@ import path from "node:path";
 
 const APP_NAME = "skyagent";
 
+export type StoredLlmProviderConfig = {
+  provider?: "litellm";
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  timeoutMs?: number;
+  maxRetries?: number;
+  rateLimit?: {
+    requestsPerMinute?: number;
+    tokensPerMinute?: number;
+  };
+  budget?: {
+    maxUsd?: number;
+    window?: string;
+  };
+};
+
+export type SkyAgentConfig = {
+  username?: string;
+  uuid?: string;
+  selectedProfileId?: string;
+  apiKey?: string;
+  llmProvider?: StoredLlmProviderConfig;
+  [key: string]: unknown;
+};
+
 export function dataDir() {
   if (process.env.SKYAGENT_HOME) {
     return path.resolve(process.env.SKYAGENT_HOME);
@@ -30,7 +56,7 @@ export function memoriesPath() {
   return path.join(dataDir(), "memories.json");
 }
 
-export function readJson(file, fallback) {
+export function readJson<T>(file: string, fallback: T): T {
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (error) {
@@ -41,17 +67,21 @@ export function readJson(file, fallback) {
   }
 }
 
-export function writeJson(file, value) {
+export function writeJson(file: string, value: unknown) {
   ensureDataDir();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-export function readConfig() {
-  return readJson(configPath(), {});
+function defaultConfig(): SkyAgentConfig {
+  return {};
 }
 
-export function writeConfig(config) {
+export function readConfig(): SkyAgentConfig {
+  return readJson(configPath(), defaultConfig());
+}
+
+export function writeConfig(config: SkyAgentConfig) {
   writeJson(configPath(), config);
 }
 
@@ -70,7 +100,7 @@ export function publicConfig(config = readConfig()) {
   };
 }
 
-export function setConfigValue(key, value) {
+export function setConfigValue(key: string, value: unknown) {
   const config = readConfig();
   if (value === null || value === undefined || value === "") {
     delete config[key];

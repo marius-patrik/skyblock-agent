@@ -10,6 +10,7 @@
     "./hypixel": "./src/hypixel.ts",
     "./inventory": "./src/inventory.ts",
     "./items": "./src/items.ts",
+    "./llm-provider": "./src/llm-provider.ts",
     "./nbt": "./src/nbt.ts",
     "./networth": "./src/networth.ts",
     "./objectives": "./src/objectives.ts",

@@ -48,6 +48,8 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 ## SkyAgent Tooling
 
 - Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
+- Use `skyagent_llm_provider_status` before persistent-agent or provider-gateway work to verify LiteLLM/OpenAI-compatible model routing, health, auth presence, rate/budget metadata, and redacted endpoint state.
+- Use `skyagent_llm_provider_config_get` and `skyagent_llm_provider_config_set` only for LLM provider gateway setup. Do not use Codex CLI session/config files as the SkyAgent product agent backend.
 - Use `skyagent setup status --json` or `skyagent setup --json` from the CLI when local profile/auth bootstrap is needed; it reports missing setup requirements without printing secrets.
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
 - Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tool map.
@@ -79,6 +81,8 @@ SkyAgent can decode inventory NBT, normalize item-stack records with optional No
 ## Secrets and Storage
 
 Prefer `HYPIXEL_API_KEY` from the environment. The CLI and MCP server can also store an API key in the SkyAgent user config directory when the user explicitly asks. Do not print API key values back to the user.
+
+Prefer `SKYAGENT_LITELLM_API_KEY` from the environment for LiteLLM provider routing. The provider config tools can store a local virtual key when the user explicitly asks, but outputs must stay redacted.
 
 For first-run setup, prefer `skyagent setup` over manual config edits. Non-interactive agents should use `skyagent setup --json --username <name> --api-key <key> --profile <profileIdOrName>` when the user has explicitly provided the secret, or `skyagent setup --json` to inspect missing requirements.
 
