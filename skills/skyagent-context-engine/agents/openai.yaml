@@ -1,7 +1,7 @@
 interface:
   display_name: "SkyAgent Context"
   short_description: "Bootstrap cached agent context."
-  default_prompt: "Use $skyagent-context-engine to load my current SkyBlock context capsule."
+  default_prompt: "Use $skyagent-context-engine to call skyagent_start and load my current SkyBlock context."
 policy:
   allow_implicit_invocation: true
 

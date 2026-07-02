@@ -1,6 +1,6 @@
 {
   "name": "skyagent",
-  "version": "0.1.0+codex.20260702151230",
+  "version": "0.1.0+codex.20260702162502",
   "description": "Codex plugin for Hypixel SkyBlock profile analysis and meta planning.",
   "author": {
     "name": "Patrik"
@@ -17,7 +17,7 @@
       "MMO progression planning",
       "Wiki and patch-note grounded recommendations"
     ],
-    "defaultPrompt": "Use SkyAgent to inspect my Hypixel SkyBlock profile and recommend the best path toward my current goal."
+    "defaultPrompt": "Use SkyAgent to call skyagent_start, load my configured Hypixel SkyBlock context, then recommend the best path toward my current goal."
   },
   "mcpServers": "./.mcp.json"
 }

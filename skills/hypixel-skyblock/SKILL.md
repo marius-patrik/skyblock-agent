@@ -4,7 +4,7 @@ description: Analyze Hypixel SkyBlock profiles, cached agent context, objectives
 metadata:
   display_name: "Hypixel SkyBlock"
   short_description: "Orchestrate SkyAgent profile analysis."
-  default_prompt: "Use $hypixel-skyblock to analyze my SkyBlock profile and route to the right SkyAgent subskill."
+  default_prompt: "Use $hypixel-skyblock to start SkyAgent with skyagent_start, load my SkyBlock context, and route to the right subskill."
 ---
 
 # Hypixel SkyBlock
@@ -21,15 +21,16 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 
 ## Default Analysis Flow
 
-1. Identify the user's concrete target and constraints.
-2. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
-3. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
-4. Use `$skyagent-live-progress` when recent context-stream events, server status, provider/cache changes, or profile refresh events may already describe the user's progress.
-5. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
-6. Pull current profile state through SkyAgent MCP tools when available.
-7. Check whether the target depends on recent patches, economy shifts, or known meta changes.
-8. Compare the user's current bottlenecks against the target.
-9. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+1. On a fresh `@SkyAgent` session, or when the user invokes SkyAgent without a narrow command, call `skyagent_start` through `$skyagent-context-engine` before asking for username; use configured player/profile when setup already exists.
+2. Identify the user's concrete target and constraints from the startup payload, context capsule, objectives, events, and user message.
+3. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
+4. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
+5. Use `$skyagent-live-progress` when recent context-stream events, server status, provider/cache changes, profile refresh events, or the `agent.session_start` cursor may already describe the user's progress.
+6. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
+7. Pull current profile state through SkyAgent MCP tools when available.
+8. Check whether the target depends on recent patches, economy shifts, or known meta changes.
+9. Compare the user's current bottlenecks against the target.
+10. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
 
 ## Subskill Routing
 
@@ -47,12 +48,13 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 
 ## SkyAgent Tooling
 
-- Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
+- Use `skyagent_start` first for fresh `@SkyAgent` sessions, broad session-scale analysis, or default plugin invocation. It should bootstrap configured identity/profile without asking for username first, return setup status, context capsule, server status, objective summary, recent events/cursor, provider status, warnings, and follow-up tools, and persist `agent.session_start`.
+- Use `skyagent_config_get` only when setup metadata is needed without a full startup/context payload.
 - Use `skyagent_llm_provider_status` before persistent-agent or provider-gateway work to verify LiteLLM/OpenAI-compatible model routing, health, auth presence, rate/budget metadata, and redacted endpoint state.
 - Use `skyagent_llm_provider_config_get` and `skyagent_llm_provider_config_set` only for LLM provider gateway setup. Do not use Codex CLI session/config files as the SkyAgent product agent backend.
 - Use `skyagent setup status --json` or `skyagent setup --json` from the CLI when local profile/auth bootstrap is needed; it reports missing setup requirements without printing secrets.
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
-- Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tool map.
+- Use `skyagent_context_bootstrap` only when `skyagent_start` is unavailable or a narrower cached context capsule is enough before broad planning.
 - Use `skyagent_context_watch` or `skyagent_context_events` when ongoing session progress, refreshes, `provider.cache_status_change`, `hypixel.server_status_change`, or explicit agent events may already be in the context stream.
 - Use `skyagent_objective_list` during session bootstrap when durable goals, todos, buy-list entries, source-list entries, or snipe targets may affect recommendations.
 - Use `skyagent_server_status` when online state, Hypixel API availability, or session mode/map matters.
