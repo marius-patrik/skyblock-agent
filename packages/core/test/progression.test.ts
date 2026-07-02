@@ -52,10 +52,12 @@ describe("progression sections", () => {
       member: {
         currencies: { coin_purse: 456, essence: { WITHER: 7 } },
         crafted_generators: ["WHEAT_1", "WHEAT_2", "COBBLESTONE_1"],
-        pets: [
-          { type: "SHEEP", tier: "LEGENDARY", exp: 1000, active: true },
-          { type: "ROCK", tier: "RARE", exp: 50 },
-        ],
+        pets_data: {
+          pets: [
+            { type: "SHEEP", tier: "LEGENDARY", exp: 1000, active: true },
+            { type: "ROCK", tier: "RARE", exp: 50 },
+          ],
+        },
         player_data: {
           experience: {
             SKILL_FARMING: SKILL_XP_THRESHOLDS[10],
@@ -150,7 +152,7 @@ describe("progression sections", () => {
         garden_player_data: { garden_experience: 0, resources_collected: {} },
         bestiary: { kills: {}, deaths: {} },
         crafted_generators: [],
-        pets: [],
+        pets_data: { pets: [] },
         nether_island_player_data: {},
         rift: {},
         trophy_fish: {},
@@ -170,5 +172,32 @@ describe("progression sections", () => {
     expect(missingData.sections.find((section) => section.section === "mining")?.warnings[0]?.code).toBe("missing_api_data");
     expect(missingData.sections.find((section) => section.section === "garden")?.warnings[0]?.code).toBe("missing_api_data");
     expect(missingData.sections.find((section) => section.section === "currencies")?.computed).toMatchObject({ purse: null, bank: null });
+  });
+
+  test("supports legacy pets while preferring current pets_data pets", () => {
+    const current = profileSectionFromContext({
+      uuid: "player-uuid",
+      profile: { profile_id: "profile-id" },
+      member: {
+        pets_data: {
+          pets: [{ type: "GOLDEN_DRAGON", tier: "LEGENDARY", exp: 500, active: true }],
+        },
+        pets: [{ type: "ROCK", tier: "RARE", exp: 10 }],
+      },
+      rateLimit: null,
+    }, "pets");
+    const legacy = profileSectionFromContext({
+      uuid: "player-uuid",
+      profile: { profile_id: "profile-id" },
+      member: {
+        pets: [{ type: "ROCK", tier: "RARE", exp: 10 }],
+      },
+      rateLimit: null,
+    }, "pets");
+
+    expect(current.computed).toMatchObject({ count: 1, active: { type: "GOLDEN_DRAGON" } });
+    expect(current.sourceFields).toEqual(["member.pets_data.pets", "member.pets"]);
+    expect(legacy.computed).toMatchObject({ count: 1 });
+    expect(legacy.warnings).toEqual([]);
   });
 });

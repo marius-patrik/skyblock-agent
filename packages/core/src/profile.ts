@@ -108,8 +108,9 @@ export function compactProfileOverview(context) {
       hasInventoryBag: Boolean(member.inventory?.bag_contents || member.inv_contents),
       hasEnderChest: Boolean(member.inventory?.ender_chest_contents || member.ender_chest_contents),
       hasArmor: Boolean(member.inventory?.inv_armor || member.inv_armor),
-      hasWardrobe: Boolean(member.inventory?.wardrobe_contents || member.wardrobe_contents),
-      hasAccessoryBag: Boolean(member.inventory?.bag_contents || member.talisman_bag),
+      hasWardrobe: Boolean(member.inventory?.wardrobe_contents || member.wardrobe_contents || member.loadout?.armor),
+      hasAccessoryBag: Boolean(member.inventory?.bag_contents?.talisman_bag || member.inventory?.bag_contents || member.talisman_bag),
+      hasPets: Boolean(member.pets_data?.pets || member.pets),
     },
     rateLimit,
   };

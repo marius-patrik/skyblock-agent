@@ -129,6 +129,7 @@ test("profiles and overview routes use injected core contracts", async () => {
           hasArmor: false,
           hasWardrobe: false,
           hasAccessoryBag: false,
+          hasPets: false,
         },
         rateLimit: context.rateLimit,
       }),

@@ -310,9 +310,11 @@ export function trophyFishingSection(member: any) {
 }
 
 export function petsSection(member: any) {
-  const pets = Array.isArray(member?.pets) ? member.pets : [];
-  const warnings = Array.isArray(member?.pets) ? [] : [missing("member.pets", "pets")];
-  return sectionResult("pets", ["member.pets"], {
+  const currentPets = member?.pets_data?.pets;
+  const legacyPets = member?.pets;
+  const pets = Array.isArray(currentPets) ? currentPets : Array.isArray(legacyPets) ? legacyPets : [];
+  const warnings = Array.isArray(currentPets) || Array.isArray(legacyPets) ? [] : [missing("member.pets_data.pets", "pets")];
+  return sectionResult("pets", ["member.pets_data.pets", "member.pets"], {
     count: pets.length,
     active: pets.find((pet: any) => pet?.active) ?? null,
     byTier: pets.reduce((result: Record<string, number>, pet: any) => {

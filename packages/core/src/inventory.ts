@@ -1,4 +1,4 @@
-import { decodeHypixelNbt, NbtDecodeError } from "./nbt.ts";
+import { decodeHypixelNbt, NbtDecodeError, payloadData } from "./nbt.ts";
 import { fetchProfileContext } from "./profile.ts";
 
 export type InventorySectionName =
@@ -38,7 +38,7 @@ const SECTION_DEFINITIONS: SectionDefinition[] = [
   {
     name: "wardrobe",
     label: "Wardrobe",
-    paths: [["inventory", "wardrobe_contents"], ["wardrobe_contents"]],
+    paths: [["inventory", "wardrobe_contents"], ["wardrobe_contents"], ["loadout", "armor"]],
   },
   {
     name: "ender_chest",
@@ -54,7 +54,7 @@ const SECTION_DEFINITIONS: SectionDefinition[] = [
   {
     name: "accessory_bag",
     label: "Accessory Bag",
-    paths: [["inventory", "bag_contents"], ["talisman_bag"], ["bag_contents"]],
+    paths: [["inventory", "bag_contents", "talisman_bag"], ["inventory", "bag_contents"], ["talisman_bag"], ["bag_contents"]],
   },
   {
     name: "personal_vault",
@@ -257,8 +257,18 @@ function warningFromError(error: unknown, sourcePath: string | null) {
   };
 }
 
+function petList(member: any) {
+  if (Array.isArray(member?.pets_data?.pets)) {
+    return { pets: member.pets_data.pets, sourcePath: "pets_data.pets", present: true };
+  }
+  if (Array.isArray(member?.pets)) {
+    return { pets: member.pets, sourcePath: "pets", present: true };
+  }
+  return { pets: [], sourcePath: "pets_data.pets", present: false };
+}
+
 function petItems(member: any, options: { debugRaw?: boolean } = {}) {
-  const pets = Array.isArray(member?.pets) ? member.pets : [];
+  const { pets, sourcePath } = petList(member);
   return pets.map((pet, index) => ({
     slot: index,
     index,
@@ -276,9 +286,126 @@ function petItems(member: any, options: { debugRaw?: boolean } = {}) {
       skin: pet.skin ?? null,
       candyUsed: pet.candyUsed ?? null,
     },
-    sourcePath: "pets",
+    sourcePath,
     ...(options.debugRaw ? { raw: pet } : {}),
   }));
+}
+
+async function decodeLoadoutArmorSection(payload: unknown, sourcePath: string, options: { debugRaw?: boolean }) {
+  if (payloadData(payload) || !payload || typeof payload !== "object") {
+    return decodeSectionPayload(payload, sourcePath, options);
+  }
+
+  const containers = [];
+  const warnings = [];
+  const armorSlots = ["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"];
+
+  if (Array.isArray(payload)) {
+    if (payload.length > 0 && payload.length < armorSlots.length) {
+      warnings.push({
+        code: "partial_loadout_armor",
+        message: `Loadout armor list is missing ${armorSlots.length - payload.length} expected armor piece(s).`,
+        sourcePath,
+      });
+    }
+    for (const [index, value] of payload.entries()) {
+      try {
+        containers.push(await decodeSectionPayload(value, `${sourcePath}.${index}`, options, String(index)));
+      } catch (error) {
+        warnings.push(warningFromError(error, `${sourcePath}.${index}`));
+      }
+    }
+    return {
+      sourcePath,
+      itemCount: containers.reduce((total, container: any) => total + container.itemCount, 0),
+      containers,
+      items: containers.flatMap((container: any) => container.items),
+      warnings: containers.length ? warnings : [{
+        code: "unsupported_section_shape",
+        message: `Section ${sourcePath} exists but no loadout armor payloads were found.`,
+        sourcePath,
+      }, ...warnings],
+    };
+  }
+
+  const directArmorSlots = armorSlots.filter((armorSlot) => (payload as Record<string, unknown>)[armorSlot] !== undefined && (payload as Record<string, unknown>)[armorSlot] !== null);
+  if (directArmorSlots.length > 0) {
+    if (directArmorSlots.length < armorSlots.length) {
+      const missingPieces = armorSlots.filter((armorSlot) => !directArmorSlots.includes(armorSlot));
+      warnings.push({
+        code: "partial_loadout_armor",
+        message: `Loadout armor is missing ${missingPieces.join(", ")}.`,
+        sourcePath,
+        missingPieces,
+      });
+    }
+    for (const armorSlot of armorSlots) {
+      const value = (payload as Record<string, any>)[armorSlot];
+      if (value === undefined || value === null) {
+        continue;
+      }
+      const path = `${sourcePath}.${armorSlot}`;
+      try {
+        containers.push(await decodeSectionPayload(value, path, options, armorSlot));
+      } catch (error) {
+        warnings.push(warningFromError(error, path));
+      }
+    }
+    return {
+      sourcePath,
+      itemCount: containers.reduce((total, container: any) => total + container.itemCount, 0),
+      containers,
+      items: containers.flatMap((container: any) => container.items),
+      warnings: containers.length ? warnings : [{
+        code: "unsupported_section_shape",
+        message: `Section ${sourcePath} exists but no loadout armor payloads were found.`,
+        sourcePath,
+      }, ...warnings],
+    };
+  }
+
+  const entries = Object.entries(payload as Record<string, any>)
+    .sort(([left], [right]) => Number(left) - Number(right) || left.localeCompare(right));
+
+  for (const [loadoutSlot, loadout] of entries) {
+    if (!loadout || typeof loadout !== "object") {
+      continue;
+    }
+    const presentArmorSlots = armorSlots.filter((armorSlot) => loadout[armorSlot] !== undefined && loadout[armorSlot] !== null);
+    if (presentArmorSlots.length > 0 && presentArmorSlots.length < armorSlots.length) {
+      const missingPieces = armorSlots.filter((armorSlot) => !presentArmorSlots.includes(armorSlot));
+      warnings.push({
+        code: "partial_loadout_armor",
+        message: `Loadout armor slot ${loadoutSlot} is missing ${missingPieces.join(", ")}.`,
+        sourcePath: `${sourcePath}.${loadoutSlot}`,
+        missingPieces,
+      });
+    }
+    for (const armorSlot of armorSlots) {
+      const value = loadout[armorSlot];
+      if (value === undefined || value === null) {
+        continue;
+      }
+      const path = `${sourcePath}.${loadoutSlot}.${armorSlot}`;
+      try {
+        containers.push(await decodeSectionPayload(value, path, options, `${loadoutSlot}:${armorSlot}`));
+      } catch (error) {
+        warnings.push(warningFromError(error, path));
+      }
+    }
+  }
+
+  return {
+    sourcePath,
+    itemCount: containers.reduce((total, container: any) => total + container.itemCount, 0),
+    containers,
+    items: containers.flatMap((container: any) => container.items),
+    warnings: containers.length ? warnings : [{
+      code: "unsupported_section_shape",
+      message: `Section ${sourcePath} exists but no loadout armor payloads were found.`,
+      sourcePath,
+    }, ...warnings],
+  };
 }
 
 export async function inventorySectionFromMember(member: unknown, sectionName: string, options: { debugRaw?: boolean } = {}) {
@@ -286,16 +413,16 @@ export async function inventorySectionFromMember(member: unknown, sectionName: s
   const definition = SECTION_DEFINITIONS.find((section) => section.name === normalized)!;
 
   if (normalized === "pets") {
-    const petsPresent = Boolean(member && typeof member === "object" && "pets" in member);
+    const pets = petList(member);
     const items = petItems(member, options);
     return {
       section: definition.name,
       label: definition.label,
-      sourcePath: "pets",
-      available: petsPresent,
+      sourcePath: pets.sourcePath,
+      available: pets.present,
       itemCount: items.length,
       items,
-      warnings: petsPresent ? [] : [{ code: "missing_section", message: "No exposed pet data found.", sourcePath: "pets" }],
+      warnings: pets.present ? [] : [{ code: "missing_section", message: "No exposed pet data found.", sourcePath: pets.sourcePath }],
     };
   }
 
@@ -317,7 +444,9 @@ export async function inventorySectionFromMember(member: unknown, sectionName: s
   }
 
   try {
-    const decoded = definition.container
+    const decoded = normalized === "wardrobe" && path === "loadout.armor"
+      ? await decodeLoadoutArmorSection(value, path, options)
+      : definition.container
       ? await decodeContainerSection(value, path, options)
       : await decodeSectionPayload(value, path, options);
     return {

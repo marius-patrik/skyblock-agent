@@ -143,6 +143,104 @@ describe("inventory extraction", () => {
     expect(section.warnings).toEqual([]);
   });
 
+  test("extracts current accessory bag from the inventory bag map talisman payload", async () => {
+    const section = await inventorySectionFromMember({
+      inventory: {
+        bag_contents: {
+          sacks_bag: { data: payload([item(0, "minecraft:wheat", "WHEAT")]) },
+          talisman_bag: { data: payload([item(1, "minecraft:skull", "BAT_ARTIFACT")]) },
+        },
+      },
+    }, "accessory_bag");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("inventory.bag_contents.talisman_bag");
+    expect(section.itemCount).toBe(1);
+    expect(section.items[0].internalId).toBe("BAT_ARTIFACT");
+  });
+
+  test("extracts current loadout armor as wardrobe data", async () => {
+    const section = await inventorySectionFromMember({
+      loadout: {
+        armor: {
+          "1": {
+            id: 1,
+            HELMET: { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+            CHESTPLATE: { data: payload([item(0, "minecraft:leather_chestplate", "NECRON_CHESTPLATE")]) },
+            LEGGINGS: { data: payload([item(0, "minecraft:leather_leggings", "NECRON_LEGGINGS")]) },
+            BOOTS: { data: payload([item(0, "minecraft:leather_boots", "NECRON_BOOTS")]) },
+          },
+        },
+      },
+    }, "wardrobe");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("loadout.armor");
+    expect(section.itemCount).toBe(4);
+    expect(section.items.map((stack) => stack.containerId)).toEqual(["1:HELMET", "1:CHESTPLATE", "1:LEGGINGS", "1:BOOTS"]);
+    expect(section.items.map((stack) => stack.internalId)).toEqual(["NECRON_HELMET", "NECRON_CHESTPLATE", "NECRON_LEGGINGS", "NECRON_BOOTS"]);
+    expect(section.warnings).toEqual([]);
+  });
+
+  test("extracts direct loadout armor piece maps as wardrobe data", async () => {
+    const section = await inventorySectionFromMember({
+      loadout: {
+        armor: {
+          HELMET: { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+          CHESTPLATE: { data: payload([item(0, "minecraft:leather_chestplate", "NECRON_CHESTPLATE")]) },
+          LEGGINGS: { data: payload([item(0, "minecraft:leather_leggings", "NECRON_LEGGINGS")]) },
+          BOOTS: { data: payload([item(0, "minecraft:leather_boots", "NECRON_BOOTS")]) },
+        },
+      },
+    }, "wardrobe");
+
+    expect(section.available).toBe(true);
+    expect(section.itemCount).toBe(4);
+    expect(section.items.map((stack) => stack.containerId)).toEqual(["HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"]);
+    expect(section.warnings).toEqual([]);
+  });
+
+  test("extracts direct loadout armor payload lists as wardrobe data", async () => {
+    const section = await inventorySectionFromMember({
+      loadout: {
+        armor: [
+          { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+          { data: payload([item(0, "minecraft:leather_chestplate", "NECRON_CHESTPLATE")]) },
+          { data: payload([item(0, "minecraft:leather_leggings", "NECRON_LEGGINGS")]) },
+          { data: payload([item(0, "minecraft:leather_boots", "NECRON_BOOTS")]) },
+        ],
+      },
+    }, "wardrobe");
+
+    expect(section.available).toBe(true);
+    expect(section.itemCount).toBe(4);
+    expect(section.items.map((stack) => stack.containerId)).toEqual(["0", "1", "2", "3"]);
+    expect(section.warnings).toEqual([]);
+  });
+
+  test("warns when current loadout armor data is partial", async () => {
+    const section = await inventorySectionFromMember({
+      loadout: {
+        armor: {
+          "1": {
+            id: 1,
+            HELMET: { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+            CHESTPLATE: { data: payload([item(0, "minecraft:leather_chestplate", "NECRON_CHESTPLATE")]) },
+          },
+        },
+      },
+    }, "wardrobe");
+
+    expect(section.available).toBe(true);
+    expect(section.itemCount).toBe(2);
+    expect(section.warnings).toContainEqual({
+      code: "partial_loadout_armor",
+      message: "Loadout armor slot 1 is missing LEGGINGS, BOOTS.",
+      sourcePath: "loadout.armor.1",
+      missingPieces: ["LEGGINGS", "BOOTS"],
+    });
+  });
+
   test("preserves warnings for corrupt backpack payloads", async () => {
     const section = await inventorySectionFromMember({
       inventory: {
@@ -165,6 +263,28 @@ describe("inventory extraction", () => {
     expect(section.available).toBe(true);
     expect(section.itemCount).toBe(0);
     expect(section.warnings).toEqual([]);
+  });
+
+  test("extracts current pets_data pets as pet inventory items", async () => {
+    const section = await inventorySectionFromMember({
+      pets_data: {
+        pets: [
+          { type: "GOLDEN_DRAGON", tier: "LEGENDARY", exp: 1_000_000, active: true, heldItem: "PET_ITEM_TIER_BOOST" },
+        ],
+      },
+    }, "pets");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("pets_data.pets");
+    expect(section.itemCount).toBe(1);
+    expect(section.items[0]).toMatchObject({
+      internalId: "GOLDEN_DRAGON",
+      sourcePath: "pets_data.pets",
+      extraAttributes: {
+        tier: "LEGENDARY",
+        heldItem: "PET_ITEM_TIER_BOOST",
+      },
+    });
   });
 
   test("reports missing section warnings for disabled or partial inventory APIs", async () => {

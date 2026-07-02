@@ -55,6 +55,16 @@ function memberWithAccessories(items: any[]) {
   };
 }
 
+function memberWithCurrentAccessoryBag(items: any[]) {
+  return {
+    inventory: {
+      bag_contents: {
+        talisman_bag: { data: payload(items) },
+      },
+    },
+  };
+}
+
 function metadataProvider(internalId: string) {
   const tiers = {
     SPEED_TALISMAN: "COMMON",
@@ -133,6 +143,20 @@ describe("accessory analysis", () => {
     expect(result.duplicates.map((entry) => entry.internalId)).toContain("SPEED_TALISMAN");
     expect(result.missing.map((entry) => entry.internalId)).not.toContain("SPEED_TALISMAN");
     expect(result.upgrades.map((entry) => entry.internalId)).toContain("SPEED_ARTIFACT");
+  });
+
+  test("reads owned accessories from the current bag map talisman payload", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithCurrentAccessoryBag([
+      item(0, "SPEED_TALISMAN", "COMMON"),
+      item(1, "VACCINE_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider,
+      accessoryMetadataProvider: accessoryUniverse,
+      priceProvider: priceProvider({ SPEED_RING: 250_000 }),
+    });
+
+    expect(result.activeAccessories.map((entry) => entry.internalId).sort()).toEqual(["SPEED_TALISMAN", "VACCINE_TALISMAN"]);
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("missing_nbt_payload");
   });
 
   test("normalizes very special rarity and special recombobulation MP", async () => {
