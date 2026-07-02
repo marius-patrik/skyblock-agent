@@ -1,8 +1,31 @@
+import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "bun:test";
+import nbt from "prismarine-nbt";
 import { buildAgentContext, buildAgentContextFromSnapshot } from "../src/agent-context.ts";
 import { buildProfileSnapshot } from "../src/profile-cache.ts";
 
 const uuid = "3206bd83fa494a5e9a1cd165a2728597";
+
+function item(slot: number, id: string, internalId: string, displayName = internalId) {
+  return {
+    Slot: { type: "byte", value: slot },
+    id: { type: "string", value: id },
+    Count: { type: "byte", value: 1 },
+    Damage: { type: "short", value: 0 },
+    tag: {
+      type: "compound",
+      value: {
+        display: { type: "compound", value: { Name: { type: "string", value: displayName } } },
+        ExtraAttributes: { type: "compound", value: { id: { type: "string", value: internalId } } },
+      },
+    },
+  };
+}
+
+function payload(items: any[]) {
+  const root = { type: "compound", name: "", value: { i: { type: "list", value: { type: "compound", value: items } } } };
+  return gzipSync(nbt.writeUncompressed(root as any)).toString("base64");
+}
 
 function context() {
   return {
@@ -26,8 +49,16 @@ function context() {
         },
       },
       inventory: {},
+      loadout: {
+        armor: {
+          "1": {
+            HELMET: { data: payload([item(0, "minecraft:skull", "NECRON_HELMET")]) },
+            CHESTPLATE: { data: payload([item(0, "minecraft:leather_chestplate", "NECRON_CHESTPLATE")]) },
+          },
+        },
+      },
       pets_data: {
-        pets: [{ uuid: "pet-1", type: "SHEEP", active: true, exp: 100 }],
+        pets: [{ uuid: "pet-1", type: "SHEEP", tier: "LEGENDARY", active: true, exp: 100, heldItem: "PET_ITEM_TEXTBOOK", skin: "BLACK", candyUsed: 2 }],
       },
       accessory_bag_storage: {
         highest_magical_power: 123,
@@ -101,8 +132,30 @@ describe("agent context capsule", () => {
     }));
     expect(capsule.accessories.warnings).toContainEqual(expect.objectContaining({ code: "accessory_price_limit_reached" }));
     expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ title: "Prepare M5" }));
-    expect(capsule.pets.activePet).toMatchObject({ internalId: "SHEEP", active: true });
-    expect(capsule.pets.items).toContainEqual(expect.objectContaining({ internalId: "SHEEP", active: true }));
+    expect(capsule.pets.activePet).toMatchObject({
+      internalId: "SHEEP",
+      tier: "LEGENDARY",
+      xp: 100,
+      level: null,
+      heldItem: "PET_ITEM_TEXTBOOK",
+      skin: "BLACK",
+      candyUsed: 2,
+      active: true,
+    });
+    expect(capsule.pets.warnings).toContainEqual(expect.objectContaining({ code: "pet_level_formula_unavailable" }));
+    expect(capsule.gear.wardrobe).toMatchObject({
+      status: "partial",
+      sourceKind: "loadout_armor_fallback",
+      currentLoadoutFallback: true,
+    });
+    expect(capsule.gear.wardrobe.warnings).toContainEqual(expect.objectContaining({ code: "current_loadout_unknown" }));
+    expect(capsule.gear.wardrobe.items).toContainEqual(expect.objectContaining({
+      internalId: "NECRON_HELMET",
+      wardrobeSource: "loadout_armor_fallback",
+      current: null,
+      loadoutSlot: "1",
+      armorSlot: "HELMET",
+    }));
     expect(capsule.followUpTools.inventory).toContain("skyblock_inventory_section");
     expect(JSON.stringify(capsule)).not.toContain("secret-key");
     expect(JSON.stringify(capsule)).not.toContain("rawSecretLikeField");
@@ -139,6 +192,38 @@ describe("agent context capsule", () => {
     expect(capsule.warnings).toContainEqual(expect.objectContaining({ code: "snapshot_only_context" }));
     expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ itemKind: "buy" }));
     expect(JSON.stringify(capsule)).not.toContain("secret-key");
+  });
+
+  test("pins active pet in compact context even when it is beyond the display limit", async () => {
+    const base = context();
+    (base.member.pets_data as any).pets = Array.from({ length: 10 }, (_, index) => ({
+      uuid: `pet-${index}`,
+      type: `PET_${index}`,
+      tier: "COMMON",
+      active: index === 9,
+      exp: index === 9 ? 1 : 10_000 - index,
+    }));
+
+    const capsule = await buildAgentContext(base, {
+      now: 1_000,
+      snapshot: buildProfileSnapshot(base, { ttlMs: 60_000, fetchedAtMs: 1_000 }),
+      providers: { generatedAt: new Date(1_000).toISOString(), providers: [], warnings: [] },
+      accessoriesProvider: async () => ({
+        status: "fresh",
+        valuation: { status: "unavailable" },
+        owned: [],
+        activeAccessories: [],
+        duplicates: [],
+        missing: [],
+        cheapestMissing: [],
+        providerFreshness: [],
+        warnings: [],
+      }),
+    });
+
+    expect(capsule.pets.activePet).toMatchObject({ internalId: "PET_9", active: true, xp: 1 });
+    expect(capsule.pets.items).toContainEqual(expect.objectContaining({ internalId: "PET_9", active: true }));
+    expect(capsule.pets.items).toHaveLength(8);
   });
 
   test("keeps official profile Magical Power when accessory-derived estimate is unavailable", async () => {

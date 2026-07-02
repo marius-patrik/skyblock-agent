@@ -18,6 +18,7 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Shared progression section framework with skill, Catacombs, Slayer XP curves plus sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Outputs include source fields, missing-data warnings, formulas/tables, and provenance.
 - Weight and readiness estimators for broad profile comparison and dungeons, Slayer, Kuudra, Garden, and Mining readiness. Exact Senither/Lily formulas are explicitly marked unsupported until maintained formula tables are bundled.
 - Deterministic goal planner and next-upgrade output that compose networth, accessory upgrades, readiness, memories/config context, source freshness, assumptions, and warnings.
+- Recommendation-grade pet and wardrobe/loadout normalization for agent context: pets expose stable type, tier, XP, active state, held item, skin, candy count, source path, and explicit missing level-formula warnings; wardrobe output distinguishes true wardrobe contents from loadout armor fallback with loadout slot, armor slot, current/unknown state, partial-loadout warnings, and source metadata.
 
 ## Missing for SkyCrypt-Style Parity
 
@@ -37,6 +38,7 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Purse and bank are included.
 - Inventory sections are separated for armor, equipment, wardrobe, inventory, ender chest, backpacks, accessory bag, personal vault, and pets when exposed by the Hypixel profile payload.
 - Item modifiers, pet levels, skins, dyes, attributes, enchantments, gemstones, recombobulation, and museum state are preserved as assumptions/context but are not independently valued yet.
+- Pet XP is preserved, but exact pet level is not derived until a maintained pet XP formula/provider is bundled. Pet networth, pet score, and skin valuation are not claimed as SkyCrypt/SkyHelper parity.
 - Results include provider freshness and confidence metadata and should be treated as estimates, not authoritative SkyCrypt/SkyHelper replacements.
 
 ## Current Accessory Limits
