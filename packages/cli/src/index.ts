@@ -157,6 +157,71 @@ function optionValues(args, option) {
   return values;
 }
 
+const GLOBAL_OUTPUT_FLAGS = new Set(["--json"]);
+const GLOBAL_OPTION_VALUE_FLAGS = new Set([
+  "--username",
+  "--api-key",
+  "--profile",
+  "--ttl-ms",
+  "--message",
+  "--kind",
+  "--type",
+  "--status",
+  "--title",
+  "--objective",
+  "--item-id",
+  "--target-price",
+  "--budget",
+  "--priority",
+  "--source-provider",
+  "--freshness-status",
+  "--freshness-source",
+  "--freshness-fetched-at",
+  "--warning",
+  "--note",
+  "--tag",
+  "--version",
+  "--restart",
+  "--section",
+  "--max-items",
+  "--timeout-ms",
+  "--max-price-lookups",
+  "--accessory-timeout-ms",
+  "--networth-timeout-ms",
+]);
+
+export function parseGlobalOutputArgs(args) {
+  const values = [];
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (GLOBAL_OUTPUT_FLAGS.has(arg) && isGlobalOutputFlag(args, index)) {
+      json = true;
+      continue;
+    }
+    values.push(arg);
+    if (GLOBAL_OPTION_VALUE_FLAGS.has(arg) && index + 1 < args.length) {
+      index += 1;
+      values.push(args[index]);
+    }
+  }
+  return { args: values, json };
+}
+
+function isGlobalOutputFlag(args, index) {
+  if (index > 0 && GLOBAL_OPTION_VALUE_FLAGS.has(args[index - 1])) {
+    return false;
+  }
+
+  const [area, action, subaction] = args;
+  const isOnlyPositionalValue =
+    (area === "config" && action === "set" && index === 3 && args.length === 4) ||
+    (area === "provider" && action === "config" && subaction === "set" && index === 4 && args.length === 5) ||
+    (area === "memory" && action === "add" && index === 2 && args.length === 3);
+
+  return !isOnlyPositionalValue;
+}
+
 function parseWarningValue(value: string) {
   const [code, message, ...sourceParts] = String(value).split(":");
   if (!code || !message) {
@@ -496,7 +561,9 @@ export function doctorStatus() {
 }
 
 export async function command(args) {
-  const [area, action, ...rest] = args;
+  const global = parseGlobalOutputArgs(args);
+  const [area, action, ...rest] = global.args;
+  const output = (value, pretty = true) => print(value, global.json ? false : pretty);
 
   if (!area || area === "help" || area === "--help" || area === "-h") {
     usage();
@@ -505,7 +572,7 @@ export async function command(args) {
 
   if (area === "config") {
     if (action === "path") {
-      print({ configPath: configPath() });
+      output({ configPath: configPath() });
       return;
     }
     if (action === "get") {
@@ -513,7 +580,7 @@ export async function command(args) {
       if (rest.includes("--show-key")) {
         config.warning = "API key values are intentionally not printed by this CLI.";
       }
-      print(config);
+      output(config);
       return;
     }
     if (action === "set") {
@@ -528,21 +595,21 @@ export async function command(args) {
       if (!keyMap[key]) {
         throw new Error("Supported config keys: username, uuid, profile, api-key");
       }
-      print(setConfigValue(keyMap[key], value));
+      output(setConfigValue(keyMap[key], value));
       return;
     }
   }
 
   if (area === "setup") {
     const args = [action, ...rest].filter(Boolean);
-    const compact = args.includes("--json");
+    const compact = global.json;
     if (action === "status") {
-      print(setupStatus(), !compact);
+      output(setupStatus(), !compact);
       return;
     }
     const parsed = parseSetupArgs(args);
     const inputs = await promptSetupInputs(parsed);
-    print(await runSetup({
+    output(await runSetup({
       username: inputs.username,
       apiKey: inputs.apiKey,
       profile: inputs.profile,
@@ -553,26 +620,25 @@ export async function command(args) {
 
   if (area === "provider") {
     const args = [action, ...rest].filter(Boolean);
-    const compact = args.includes("--json");
+    const compact = global.json;
     if (action === "status") {
-      print(await llmProviderStatus(), !compact);
+      output(await llmProviderStatus(), !compact);
       return;
     }
     if (action === "config") {
       const [configAction, ...configRest] = rest;
-      const configArgs = [configAction, ...configRest].filter(Boolean);
-      const configCompact = configArgs.includes("--json");
+      const configCompact = global.json;
       if (configAction === "get") {
-        print(publicLlmProviderConfig(), !configCompact);
+        output(publicLlmProviderConfig(), !configCompact);
         return;
       }
       if (configAction === "set") {
-        const values = configRest.filter((arg) => arg !== "--json");
+        const values = configRest;
         const [key, ...valueParts] = values;
         if (!key) {
           throw new Error("Usage: skyagent provider config set <provider|base-url|model|api-key|timeout-ms|max-retries|rate-limit-rpm|rate-limit-tpm|budget-usd|budget-window> <value>");
         }
-        print(setLlmProviderConfigValue(key, valueParts.join(" ")), !configCompact);
+        output(setLlmProviderConfigValue(key, valueParts.join(" ")), !configCompact);
         return;
       }
     }
@@ -580,21 +646,19 @@ export async function command(args) {
   }
 
   if (area === "version") {
-    const compact = [action, ...rest].includes("--json");
     const version = setupStatus().version;
-    print({ version }, !compact);
+    output({ version });
     return;
   }
 
   if (area === "doctor") {
-    const compact = [action, ...rest].includes("--json");
-    print(doctorStatus(), !compact);
+    output(doctorStatus());
     return;
   }
 
   if (area === "start") {
     const parsed = parseStartArgs([action, ...rest].filter(Boolean));
-    print(await startSkyAgentSession({
+    output(await startSkyAgentSession({
       player: parsed.values[0],
       profile: parsed.values[1],
       refresh: parsed.refresh,
@@ -603,7 +667,7 @@ export async function command(args) {
       ttlMs: parsed.ttlMs,
       sourceKind: "cli",
       sourceTransport: "command",
-    }), !parsed.json);
+    }));
     return;
   }
 
@@ -613,7 +677,7 @@ export async function command(args) {
       return;
     }
     if (action === "emit") {
-      print(persistContextEvent({
+      output(persistContextEvent({
         type: rest.find((arg) => !arg.startsWith("--")) ?? "cli.context_event",
         source: { kind: "cli", transport: "command" },
         payload: { message: optionValue(rest, "--message") ?? null },
@@ -622,7 +686,7 @@ export async function command(args) {
       return;
     }
     const parsed = parseContextArgs([action, ...rest].filter(Boolean));
-    print(await agentContextForPlayer(parsed.values[0], parsed.values[1], {
+    output(await agentContextForPlayer(parsed.values[0], parsed.values[1], {
       refresh: parsed.refresh,
       cacheOnly: parsed.cacheOnly ? true : undefined,
       allowStale: parsed.allowStale,
@@ -632,17 +696,17 @@ export async function command(args) {
   }
 
   if (area === "server-status") {
-    print(await serverStatusForPlayer(action));
+    output(await serverStatusForPlayer(action));
     return;
   }
 
   if (area === "objective") {
     if (action === "create") {
-      print(createObjectiveItem(parseObjectiveCreateArgs(rest)));
+      output(createObjectiveItem(parseObjectiveCreateArgs(rest)));
       return;
     }
     if (action === "list") {
-      print(listObjectiveItems({
+      output(listObjectiveItems({
         kind: optionValue(rest, "--kind") ?? optionValue(rest, "--type"),
         status: optionValue(rest, "--status"),
         includeDeleted: rest.includes("--include-deleted"),
@@ -653,15 +717,15 @@ export async function command(args) {
       if (!rest[0]) {
         throw new Error("Usage: skyagent objective update <id> [flags]");
       }
-      print(updateObjectiveItem(rest[0], parseObjectivePatchArgs(rest.slice(1))));
+      output(updateObjectiveItem(rest[0], parseObjectivePatchArgs(rest.slice(1))));
       return;
     }
     if (action === "complete") {
-      print(completeObjectiveItem(rest[0]));
+      output(completeObjectiveItem(rest[0]));
       return;
     }
     if (action === "delete") {
-      print(deleteObjectiveItem(rest[0]));
+      output(deleteObjectiveItem(rest[0]));
       return;
     }
     throw new Error("Usage: skyagent objective create|list|update|complete|delete");
@@ -670,25 +734,23 @@ export async function command(args) {
   if (area === "update") {
     const parsed = parseUpdateArgs(rest);
     if (action === "check") {
-      print(await updatePlan({ version: parsed.version }), !parsed.json);
+      output(await updatePlan({ version: parsed.version }), !parsed.json);
       return;
     }
     if (action === "install") {
-      print(await installUpdate({ version: parsed.version, dryRun: parsed.dryRun, restart: parsed.restart }), !parsed.json);
+      output(await installUpdate({ version: parsed.version, dryRun: parsed.dryRun, restart: parsed.restart }), !parsed.json);
       return;
     }
     throw new Error("Usage: skyagent update check|install [--version <version>] [--dry-run] [--restart <gateway|web|all>]");
   }
 
   if (area === "gateway") {
-    const compact = rest.includes("--json");
-    print(await gatewayCommand(action, rest.filter((arg) => arg !== "--json")), !compact);
+    output(await gatewayCommand(action, rest), true);
     return;
   }
 
   if (area === "web") {
-    const compact = rest.includes("--json");
-    print(await webCommand(action, rest.filter((arg) => arg !== "--json")), !compact);
+    output(await webCommand(action, rest), true);
     return;
   }
 
@@ -699,50 +761,50 @@ export async function command(args) {
       if (!text) {
         throw new Error("Memory text is required.");
       }
-      print(addMemory({ text, tags }));
+      output(addMemory({ text, tags }));
       return;
     }
     if (action === "list") {
-      print(readMemories());
+      output(readMemories());
       return;
     }
     if (action === "get") {
       const id = rest[0];
-      print(readMemories().find((memory) => memory.id === id) ?? null);
+      output(readMemories().find((memory) => memory.id === id) ?? null);
       return;
     }
     if (action === "delete") {
-      print(deleteMemory(rest[0]));
+      output(deleteMemory(rest[0]));
       return;
     }
   }
 
   if (area === "resolve") {
-    print(await resolveMinecraftUsername(action));
+    output(await resolveMinecraftUsername(action));
     return;
   }
 
   if (area === "player") {
     const uuid = await uuidFromNameOrUuid(action);
-    print(await hypixelRequest("player", { uuid }, { requireKey: true }));
+    output(await hypixelRequest("player", { uuid }, { requireKey: true }));
     return;
   }
 
   if (area === "status") {
     const uuid = await uuidFromNameOrUuid(action);
-    print(await hypixelRequest("status", { uuid }, { requireKey: true }));
+    output(await hypixelRequest("status", { uuid }, { requireKey: true }));
     return;
   }
 
   if (area === "profiles") {
-    print(await skyblockProfiles(action));
+    output(await skyblockProfiles(action));
     return;
   }
 
   if (area === "profiles-summary") {
     const uuid = await uuidFromNameOrUuid(action);
     const response = await skyblockProfiles(uuid);
-    print({
+    output({
       uuid,
       profiles: profileSummaries(response.body?.profiles ?? [], uuid),
       rateLimit: response.rateLimit,
@@ -752,7 +814,7 @@ export async function command(args) {
 
   if (area === "profile-snapshot") {
     const parsed = parseProfileSnapshotArgs([action, ...rest].filter(Boolean));
-    print(await profileSnapshotForPlayer(parsed.values[0], parsed.values[1], {
+    output(await profileSnapshotForPlayer(parsed.values[0], parsed.values[1], {
       refresh: parsed.refresh,
       cacheOnly: parsed.cacheOnly,
       allowStale: parsed.allowStale,
@@ -763,7 +825,7 @@ export async function command(args) {
 
   if (area === "member") {
     const context = await fetchProfileContext(action, rest[0]);
-    print({
+    output({
       uuid: context.uuid,
       profile: {
         profileId: context.profile.profile_id,
@@ -776,20 +838,20 @@ export async function command(args) {
   }
 
   if (area === "overview") {
-    print(compactProfileOverview(await fetchProfileContext(action, rest[0])));
+    output(compactProfileOverview(await fetchProfileContext(action, rest[0])));
     return;
   }
 
   if (area === "inventory") {
     const args = [action, ...rest].filter(Boolean);
     const parsed = parseInventoryArgs(args);
-    print(await inventoryForPlayer(parsed.values[0], parsed.values[1], { debugRaw: parsed.debugRaw }));
+    output(await inventoryForPlayer(parsed.values[0], parsed.values[1], { debugRaw: parsed.debugRaw }));
     return;
   }
 
   if (area === "inventory-section") {
     const values = withoutFlags(rest);
-    print(await inventorySectionForPlayer(action, values[0], values[1], { debugRaw: rest.includes("--debug-raw") }));
+    output(await inventorySectionForPlayer(action, values[0], values[1], { debugRaw: rest.includes("--debug-raw") }));
     return;
   }
 
@@ -800,7 +862,7 @@ export async function command(args) {
       throw new Error("Usage: skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section>");
     }
     const result = await inventorySectionForPlayer(parsed.section, parsed.values[0], parsed.values[1], { debugRaw: parsed.debugRaw });
-    print({
+    output({
       uuid: result.uuid,
       profile: result.profile,
       section: result.section,
@@ -814,7 +876,7 @@ export async function command(args) {
 
   if (area === "normalize-items") {
     const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await normalizedItemsForPlayer(values[0], values[1]));
+    output(await normalizedItemsForPlayer(values[0], values[1]));
     return;
   }
 
@@ -822,7 +884,7 @@ export async function command(args) {
     const args = [action, ...rest].filter(Boolean);
     const values = positionalArgs(args, ["--max-items", "--timeout-ms", "--summary", "--details"]);
     const bounds = parseNetworthBounds(args);
-    print(await networthForPlayer(values[0], values[1], bounds));
+    output(await networthForPlayer(values[0], values[1], bounds));
     return;
   }
 
@@ -832,7 +894,7 @@ export async function command(args) {
     if (!parsed.section) {
       throw new Error("Usage: skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>");
     }
-    print(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section, {
+    output(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section, {
       maxItems: parsed.maxItems,
       timeoutMs: parsed.timeoutMs,
       includeItems: parsed.includeItems,
@@ -843,14 +905,14 @@ export async function command(args) {
   if (area === "accessories") {
     const args = [action, ...rest].filter(Boolean);
     const values = positionalArgs(args, ["--max-price-lookups", "--timeout-ms"]);
-    print(await accessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
+    output(await accessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
     return;
   }
 
   if (area === "missing-accessories") {
     const args = [action, ...rest].filter(Boolean);
     const values = positionalArgs(args, ["--max-price-lookups", "--timeout-ms"]);
-    print(await missingAccessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
+    output(await missingAccessoriesForPlayer(values[0], values[1], parseAccessoryBounds(args)));
     return;
   }
 
@@ -859,7 +921,7 @@ export async function command(args) {
     if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
       throw new Error("Usage: skyagent accessory-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
     }
-    print(await accessoryUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
+    output(await accessoryUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
       maxPriceLookups: parsed.maxPriceLookups,
       timeoutMs: parsed.timeoutMs,
     }));
@@ -870,19 +932,19 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent section <name> [nameOrUuid] [profileIdOrName]");
     }
-    print(await profileSectionForPlayer(action, rest[0], rest[1]));
+    output(await profileSectionForPlayer(action, rest[0], rest[1]));
     return;
   }
 
   if (area === "progression") {
     const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await progressionForPlayer(values[0], values[1]));
+    output(await progressionForPlayer(values[0], values[1]));
     return;
   }
 
   if (area === "weight") {
     const values = withoutFlags([action, ...rest].filter(Boolean));
-    print(await weightForPlayer(values[0], values[1]));
+    output(await weightForPlayer(values[0], values[1]));
     return;
   }
 
@@ -890,7 +952,7 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]");
     }
-    print(await readinessForPlayer(action, rest[0], rest[1]));
+    output(await readinessForPlayer(action, rest[0], rest[1]));
     return;
   }
 
@@ -902,7 +964,7 @@ export async function command(args) {
     if (parsed.budget !== null && (!Number.isFinite(parsed.budget) || parsed.budget < 0)) {
       throw new Error("Usage: skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
     }
-    print(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], {
+    output(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], {
       budget: parsed.budget,
       useContext: parsed.useContext,
       persistObjectives: parsed.persistObjectives,
@@ -920,7 +982,7 @@ export async function command(args) {
     if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
       throw new Error("Usage: skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
     }
-    print(await nextUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
+    output(await nextUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget, {
       maxPriceLookups: parsed.maxPriceLookups,
       accessoryTimeoutMs: parsed.accessoryTimeoutMs,
     }));
@@ -931,7 +993,7 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent item <internalId>");
     }
-    print(await itemMetadata(action));
+    output(await itemMetadata(action));
     return;
   }
 
@@ -939,7 +1001,7 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent price <itemId>");
     }
-    print(await itemPrice(action));
+    output(await itemPrice(action));
     return;
   }
 
@@ -947,7 +1009,7 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent lbin <itemId>");
     }
-    print(await lowestBin(action));
+    output(await lowestBin(action));
     return;
   }
 
@@ -955,48 +1017,48 @@ export async function command(args) {
     if (!action) {
       throw new Error("Usage: skyagent price-history <itemId> [window]");
     }
-    print(await coflnetPriceHistory(action, rest[0]));
+    output(await coflnetPriceHistory(action, rest[0]));
     return;
   }
 
   if (area === "skycrypt") {
-    print({ url: skycryptUrl(action ?? publicConfig().username ?? publicConfig().uuid, rest[0]) });
+    output({ url: skycryptUrl(action ?? publicConfig().username ?? publicConfig().uuid, rest[0]) });
     return;
   }
 
   if (area === "profile") {
-    print(await hypixelRequest("skyblock/profile", { profile: await configuredProfileId(action) }, { requireKey: true }));
+    output(await hypixelRequest("skyblock/profile", { profile: await configuredProfileId(action) }, { requireKey: true }));
     return;
   }
 
   if (area === "museum") {
-    print(await hypixelRequest("skyblock/museum", { profile: await configuredProfileId(action) }, { requireKey: true }));
+    output(await hypixelRequest("skyblock/museum", { profile: await configuredProfileId(action) }, { requireKey: true }));
     return;
   }
 
   if (area === "garden") {
-    print(await hypixelRequest("skyblock/garden", { profile: await configuredProfileId(action) }, { requireKey: true }));
+    output(await hypixelRequest("skyblock/garden", { profile: await configuredProfileId(action) }, { requireKey: true }));
     return;
   }
 
   if (area === "bingo") {
     const uuid = await uuidFromNameOrUuid(action);
-    print(await hypixelRequest("skyblock/bingo", { uuid }, { requireKey: true }));
+    output(await hypixelRequest("skyblock/bingo", { uuid }, { requireKey: true }));
     return;
   }
 
   if (area === "resource") {
-    print(await hypixelRequest(resourceEndpoint(action)));
+    output(await hypixelRequest(resourceEndpoint(action)));
     return;
   }
 
   if (area === "bazaar") {
-    print(await hypixelRequest("skyblock/bazaar"));
+    output(await hypixelRequest("skyblock/bazaar"));
     return;
   }
 
   if (area === "auctions") {
-    print(await hypixelRequest("skyblock/auctions", { page: action || 0 }));
+    output(await hypixelRequest("skyblock/auctions", { page: action || 0 }));
     return;
   }
 
@@ -1005,27 +1067,27 @@ export async function command(args) {
     if (!["uuid", "player", "profile"].includes(lookupType) || !lookupId) {
       throw new Error("Usage: skyagent auction <uuid|player|profile> <id>");
     }
-    print(await hypixelRequest("skyblock/auction", { [lookupType]: lookupId }, { requireKey: true }));
+    output(await hypixelRequest("skyblock/auction", { [lookupType]: lookupId }, { requireKey: true }));
     return;
   }
 
   if (area === "auctions-ended") {
-    print(await hypixelRequest("skyblock/auctions_ended"));
+    output(await hypixelRequest("skyblock/auctions_ended"));
     return;
   }
 
   if (area === "firesales") {
-    print(await hypixelRequest("skyblock/firesales"));
+    output(await hypixelRequest("skyblock/firesales"));
     return;
   }
 
   if (area === "news") {
-    print(await hypixelRequest("skyblock/news", {}, { requireKey: true }));
+    output(await hypixelRequest("skyblock/news", {}, { requireKey: true }));
     return;
   }
 
   if (area === "request") {
-    print(await hypixelRequest(action, kvPairs(rest)));
+    output(await hypixelRequest(action, kvPairs(rest)));
     return;
   }
 

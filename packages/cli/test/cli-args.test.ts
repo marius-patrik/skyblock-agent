@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -28,6 +28,37 @@ function isolatedSkyAgentHome() {
 }
 
 describe("CLI argument parsing", () => {
+  test("global output flags are positional-safe", () => {
+    expect(parseGlobalOutputArgs(["--json", "overview", "Notch", "Apple"])).toEqual({
+      json: true,
+      args: ["overview", "Notch", "Apple"],
+    });
+    expect(parseGlobalOutputArgs(["overview", "--json"])).toEqual({
+      json: true,
+      args: ["overview"],
+    });
+    expect(parseGlobalOutputArgs(["overview", "Notch", "--json"])).toEqual({
+      json: true,
+      args: ["overview", "Notch"],
+    });
+    expect(parseGlobalOutputArgs(["context", "emit", "note", "--message", "--json"])).toEqual({
+      json: false,
+      args: ["context", "emit", "note", "--message", "--json"],
+    });
+    expect(parseGlobalOutputArgs(["provider", "config", "set", "api-key", "--json"])).toEqual({
+      json: false,
+      args: ["provider", "config", "set", "api-key", "--json"],
+    });
+    expect(parseGlobalOutputArgs(["provider", "config", "set", "model", "skyagent-codex", "--json"])).toEqual({
+      json: true,
+      args: ["provider", "config", "set", "model", "skyagent-codex"],
+    });
+    expect(parseGlobalOutputArgs(["config", "set", "username", "--json"])).toEqual({
+      json: false,
+      args: ["config", "set", "username", "--json"],
+    });
+  });
+
   test("item-dump accepts the documented no-player --section form", async () => {
     isolatedSkyAgentHome();
 
@@ -212,6 +243,22 @@ describe("CLI argument parsing", () => {
     isolatedSkyAgentHome();
 
     await command(["start", "--json"]);
+  });
+
+  test("json flag is not interpreted as player for no-live status/context commands", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["--json", "version"]);
+    await command(["version", "--json"]);
+    await command(["doctor", "--json"]);
+    await command(["setup", "status", "--json"]);
+    await command(["server-status", "--json"]);
+    await expect(command(["context", "--json"])).rejects.toThrow("No username or UUID provided");
+    await expect(command(["context", "--json"])).rejects.not.toThrow("--json");
+    await expect(command(["inventory", "--json"])).rejects.toThrow("No username or UUID provided");
+    await expect(command(["inventory", "--json"])).rejects.not.toThrow("--json");
+    await expect(command(["plan", "f7", "--budget", "1000", "--json"])).rejects.toThrow("No username or UUID provided");
+    await expect(command(["plan", "f7", "--budget", "1000", "--json"])).rejects.not.toThrow("--json");
   });
 
   test("context watch and emit commands run without live credentials", async () => {
