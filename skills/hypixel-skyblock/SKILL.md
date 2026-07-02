@@ -46,6 +46,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
 - Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tool map.
 - Use `skyagent_context_watch` or `skyagent_context_events` when ongoing session progress, refreshes, `provider.cache_status_change`, `hypixel.server_status_change`, or explicit agent events may already be in the context stream.
+- Use `skyagent_objective_list` during session bootstrap when durable goals, todos, buy-list entries, source-list entries, or snipe targets may affect recommendations.
 - Use `skyagent_server_status` when online state, Hypixel API availability, or session mode/map matters.
 - Use `skyblock_profiles` to inspect the user's available SkyBlock profiles before choosing a profile-specific endpoint.
 - Use `skyblock_profile_snapshot` for normalized profile-cache reads and repeated narrow analysis after bootstrap. Prefer `skyagent_context_bootstrap` for session bootstrap and broad context capsules; use `refresh` when the user asks for current state and `allowStale` only when explicitly accepting stale context.

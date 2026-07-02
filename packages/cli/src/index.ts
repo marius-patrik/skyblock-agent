@@ -11,6 +11,7 @@ import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resource
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
+import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { profileSnapshotForPlayer } from "@skyagent/core/profile-cache";
@@ -50,6 +51,11 @@ Usage:
   skyagent context watch [--since <sequence>] [--limit <n>] [--once]
   skyagent context emit [type] [--message <text>]
   skyagent server-status [nameOrUuid]
+  skyagent objective create <objective|task|buy|source|snipe> <title> [--objective <id>] [--item-id <id>] [--target-price <coins>] [--budget <coins>] [--priority <n>] [--source-provider <name>] [--freshness-status <status>] [--freshness-source <source>] [--freshness-fetched-at <iso>] [--warning <code:message[:sourcePath]>...] [--note <text>] [--tag <tag>...]
+  skyagent objective list [--kind <kind>] [--status <status>] [--include-deleted]
+  skyagent objective update <id> [--title <text>] [--status <status>] [--objective <id>] [--item-id <id>] [--target-price <coins>] [--budget <coins>] [--priority <n>] [--source-provider <name>] [--freshness-status <status>] [--freshness-source <source>] [--freshness-fetched-at <iso>] [--warning <code:message[:sourcePath]>...] [--note <text>] [--tag <tag>...]
+  skyagent objective complete <id>
+  skyagent objective delete <id>
   skyagent update check [--json] [--version <version>]
   skyagent update install [--json] [--version <version>] [--dry-run] [--restart <gateway|web|all>]
   skyagent resolve <minecraftName>
@@ -131,6 +137,29 @@ function withoutFlags(args) {
 function optionValue(args, option) {
   const index = args.indexOf(option);
   return index === -1 ? null : args[index + 1] ?? null;
+}
+
+function optionValues(args, option) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === option && args[index + 1]) {
+      values.push(args[index + 1]);
+      index += 1;
+    }
+  }
+  return values;
+}
+
+function parseWarningValue(value: string) {
+  const [code, message, ...sourceParts] = String(value).split(":");
+  if (!code || !message) {
+    throw new Error("--warning values must use code:message[:sourcePath]");
+  }
+  return {
+    code,
+    message,
+    sourcePath: sourceParts.join(":") || null,
+  };
 }
 
 function positionalArgs(args, optionsWithValues = []) {
@@ -226,6 +255,62 @@ export function parseContextArgs(args) {
     cacheOnly: args.includes("--cache-only"),
     allowStale: args.includes("--allow-stale"),
     ttlMs: ttl === null ? undefined : Number(ttl),
+  };
+}
+
+function parseObjectivePatchArgs(args) {
+  const patch: Record<string, any> = {};
+  const map = {
+    "--title": "title",
+    "--status": "status",
+    "--objective": "objectiveId",
+    "--item-id": "itemId",
+    "--target-price": "targetPrice",
+    "--budget": "budget",
+    "--priority": "priority",
+    "--source-provider": "sourceProvider",
+    "--note": "notes",
+  };
+  for (const [flag, key] of Object.entries(map)) {
+    const value = optionValue(args, flag);
+    if (value !== null) {
+      patch[key] = value;
+    }
+  }
+  const tags = optionValues(args, "--tag");
+  if (tags.length) {
+    patch.tags = tags;
+  }
+  const freshness: Record<string, any> = {};
+  const freshnessStatus = optionValue(args, "--freshness-status");
+  const freshnessSource = optionValue(args, "--freshness-source");
+  const freshnessFetchedAt = optionValue(args, "--freshness-fetched-at");
+  if (freshnessStatus !== null) freshness.status = freshnessStatus;
+  if (freshnessSource !== null) freshness.source = freshnessSource;
+  if (freshnessFetchedAt !== null) freshness.fetchedAt = freshnessFetchedAt;
+  const warnings = optionValues(args, "--warning").map(parseWarningValue);
+  if (warnings.length) freshness.warnings = warnings;
+  if (Object.keys(freshness).length) {
+    patch.freshness = freshness;
+  }
+  return patch;
+}
+
+function parseObjectiveCreateArgs(args) {
+  const [itemKind, ...rest] = args;
+  const titleParts = [];
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index];
+    if (arg.startsWith("--")) {
+      index += 1;
+      continue;
+    }
+    titleParts.push(arg);
+  }
+  return {
+    ...parseObjectivePatchArgs(rest),
+    itemKind,
+    title: titleParts.join(" "),
   };
 }
 
@@ -456,6 +541,37 @@ export async function command(args) {
   if (area === "server-status") {
     print(await serverStatusForPlayer(action));
     return;
+  }
+
+  if (area === "objective") {
+    if (action === "create") {
+      print(createObjectiveItem(parseObjectiveCreateArgs(rest)));
+      return;
+    }
+    if (action === "list") {
+      print(listObjectiveItems({
+        kind: optionValue(rest, "--kind") ?? optionValue(rest, "--type"),
+        status: optionValue(rest, "--status"),
+        includeDeleted: rest.includes("--include-deleted"),
+      }));
+      return;
+    }
+    if (action === "update") {
+      if (!rest[0]) {
+        throw new Error("Usage: skyagent objective update <id> [flags]");
+      }
+      print(updateObjectiveItem(rest[0], parseObjectivePatchArgs(rest.slice(1))));
+      return;
+    }
+    if (action === "complete") {
+      print(completeObjectiveItem(rest[0]));
+      return;
+    }
+    if (action === "delete") {
+      print(deleteObjectiveItem(rest[0]));
+      return;
+    }
+    throw new Error("Usage: skyagent objective create|list|update|complete|delete");
   }
 
   if (area === "update") {

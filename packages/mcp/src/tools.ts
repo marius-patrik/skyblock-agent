@@ -6,6 +6,7 @@ import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resource
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
+import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { profileSnapshotForPlayer } from "@skyagent/core/profile-cache";
@@ -151,6 +152,87 @@ export const tools = [
         payload: { type: "object" },
         source: { type: "object" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_objective_create",
+    description: "Create a durable local SkyAgent objective, task, buy-list entry, source-list entry, or snipe target.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        itemKind: { type: "string", enum: ["objective", "task", "buy", "source", "snipe"] },
+        title: { type: "string" },
+        objectiveId: { type: "string" },
+        notes: { type: "string" },
+        priority: { type: "number" },
+        tags: { type: "array", items: { type: "string" } },
+        itemId: { type: "string" },
+        targetPrice: { type: "number" },
+        budget: { type: "number" },
+        sourceProvider: { type: "string" },
+        freshness: { type: "object" },
+        payload: { type: "object" },
+      },
+      required: ["itemKind", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_objective_list",
+    description: "List durable local SkyAgent objective items, optionally filtered by kind and status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        itemKind: { type: "string", enum: ["objective", "task", "buy", "source", "snipe"] },
+        kind: { type: "string", enum: ["objective", "task", "buy", "source", "snipe"] },
+        status: { type: "string", enum: ["open", "active", "blocked", "done", "deleted"] },
+        includeDeleted: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_objective_update",
+    description: "Update a durable local SkyAgent objective item, including status, price, budget, priority, source, freshness, and warning metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        title: { type: "string" },
+        status: { type: "string", enum: ["open", "active", "blocked", "done", "deleted"] },
+        objectiveId: { type: "string" },
+        notes: { type: "string" },
+        priority: { type: "number" },
+        tags: { type: "array", items: { type: "string" } },
+        itemId: { type: "string" },
+        targetPrice: { type: "number" },
+        budget: { type: "number" },
+        sourceProvider: { type: "string" },
+        freshness: { type: "object" },
+        payload: { type: "object" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_objective_complete",
+    description: "Mark a durable local SkyAgent objective item done.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_objective_delete",
+    description: "Soft-delete a durable local SkyAgent objective item.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
       additionalProperties: false,
     },
   },
@@ -657,6 +739,18 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
         payload: args.payload ?? {},
         freshness: { status: "local", source: "mcp" },
       });
+    case "skyagent_objective_create":
+      return createObjectiveItem(args);
+    case "skyagent_objective_list":
+      return listObjectiveItems(args);
+    case "skyagent_objective_update": {
+      const { id, ...patch } = args;
+      return updateObjectiveItem(id, patch);
+    }
+    case "skyagent_objective_complete":
+      return completeObjectiveItem(args.id);
+    case "skyagent_objective_delete":
+      return deleteObjectiveItem(args.id);
     case "minecraft_resolve_username":
       return resolveMinecraftUsername(args.username);
     case "hypixel_player":

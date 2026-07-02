@@ -6,6 +6,7 @@ export * from "./inventory.ts";
 export * from "./items.ts";
 export * from "./nbt.ts";
 export * from "./networth.ts";
+export * from "./objectives.ts";
 export * from "./planner.ts";
 export * from "./prices.ts";
 export * from "./progression.ts";

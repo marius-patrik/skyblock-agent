@@ -1,6 +1,7 @@
 import { calculateAccessoriesFromMember } from "./accessories.ts";
 import { inventorySectionFromMember } from "./inventory.ts";
 import { emitContextEvent, providerStatusWithEvent } from "./context-events.ts";
+import { objectiveContextSummary } from "./objectives.ts";
 import { READINESS_AREAS, readinessFromContext } from "./readiness.ts";
 import { buildProfileSnapshot, profileSnapshotForPlayer, writeProfileSnapshot } from "./profile-cache.ts";
 import { fetchProfileContext } from "./profile.ts";
@@ -79,7 +80,7 @@ function followUpTools() {
     inventory: ["skyblock_inventory_section", "skyblock_item_dump", "skyblock_normalized_items"],
     economy: ["skyblock_networth", "skyblock_item_networth", "skyblock_price", "skyblock_price_history"],
     progression: ["skyblock_progression", "skyblock_profile_section", "skyblock_readiness", "skyblock_weight"],
-    planning: ["skyblock_plan_goal", "skyblock_next_upgrades"],
+    planning: ["skyblock_plan_goal", "skyblock_next_upgrades", "skyagent_objective_create", "skyagent_objective_list", "skyagent_objective_update"],
   };
 }
 
@@ -241,6 +242,7 @@ export async function buildAgentContext(context: any, options: Record<string, an
     pets: petSummary(pets, 8),
     accessories: compactAccessories(accessories),
     readiness: readiness.map(compactReadiness),
+    objectives: options.objectives ?? objectiveContextSummary(),
     providerFreshness: {
       generatedAt: providers.generatedAt,
       providers: (providers.providers ?? []).map((provider: any) => ({
@@ -292,6 +294,7 @@ export function buildAgentContextFromSnapshot(snapshot: any, options: Record<str
     pets: cachedSectionSummary(snapshot, cached.pets, "hasPets", "Pet"),
     accessories: cachedAccessoriesSummary(snapshot),
     readiness: cachedReadinessSummary(snapshot),
+    objectives: options.objectives ?? objectiveContextSummary(),
     providerFreshness: {
       generatedAt: providers.generatedAt,
       providers: (providers.providers ?? []).map((provider: any) => ({

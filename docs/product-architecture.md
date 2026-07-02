@@ -112,6 +112,10 @@ Hypixel server status reads and monitoring share the same reusable core producer
 
 Provider status reads emit `provider.cache_status` and `provider.cache_status_change`. The gateway provider route and agent context bootstrap both use this producer so cache/provider changes are visible to context watchers.
 
+## Objective Store
+
+Durable agent work items live in `objectives.json` under SkyAgent home. A normalized item model covers objectives, tasks/todos, buy-list entries, source-list entries, and snipe targets with stable IDs, status transitions, item IDs, target prices, budgets, priority, source provider, freshness, and warnings. CLI and MCP surfaces expose create/list/update/complete/delete operations, and context capsules include a compact live objective summary even when profile data is loaded from cache.
+
 Minecraft mod telemetry is reserved as a future producer through provenance metadata only. Expected future fields include `modId`, `minecraftVersion`, `sessionId`, `world`, `location`, `inventoryDelta`, and `objectiveProgress`; this repo slice does not implement the Fabric mod.
 
 ## TUI And Web

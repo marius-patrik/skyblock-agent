@@ -12,6 +12,7 @@
     "./items": "./src/items.ts",
     "./nbt": "./src/nbt.ts",
     "./networth": "./src/networth.ts",
+    "./objectives": "./src/objectives.ts",
     "./planner": "./src/planner.ts",
     "./prices": "./src/prices.ts",
     "./progression": "./src/progression.ts",

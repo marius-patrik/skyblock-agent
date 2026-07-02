@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
+import { listObjectiveItems } from "@skyagent/core/objectives";
 import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
@@ -174,6 +175,40 @@ describe("CLI argument parsing", () => {
     }
 
     expect(writes.join("")).toContain("\"type\":\"cli.stream_test\"");
+  });
+
+  test("objective commands create, update, complete, and delete local work items", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["objective", "create", "buy", "Buy", "Hyperion", "--item-id", "HYPERION", "--target-price", "2000000000", "--budget", "2100000000", "--priority", "10", "--source-provider", "coflnet", "--freshness-status", "fresh", "--freshness-source", "coflnet", "--warning", "volatile:Price moved:prices.lbin", "--tag", "mage"]);
+    const created = listObjectiveItems({ kind: "buy" }).items[0];
+
+    expect(created).toMatchObject({
+      title: "Buy Hyperion",
+      itemId: "HYPERION",
+      targetPrice: 2_000_000_000,
+      sourceProvider: "coflnet",
+      tags: ["mage"],
+      freshness: {
+        status: "fresh",
+        source: "coflnet",
+        warnings: [{ code: "volatile", message: "Price moved", sourcePath: "prices.lbin" }],
+      },
+    });
+
+    await command(["objective", "update", created.id, "--status", "active", "--note", "Watch during low volume", "--freshness-status", "stale", "--warning", "old_cache:Refresh before buying"]);
+    expect(listObjectiveItems({ status: "active" }).items[0]).toMatchObject({ id: created.id, notes: "Watch during low volume" });
+    expect(listObjectiveItems({ status: "active" }).items[0].freshness).toMatchObject({
+      status: "stale",
+      warnings: [{ code: "old_cache", message: "Refresh before buying", sourcePath: null }],
+    });
+
+    await command(["objective", "complete", created.id]);
+    expect(listObjectiveItems({ status: "done" }).items[0].id).toBe(created.id);
+
+    await command(["objective", "delete", created.id]);
+    expect(listObjectiveItems().items).toEqual([]);
+    expect(listObjectiveItems({ includeDeleted: true }).items[0]).toMatchObject({ id: created.id, status: "deleted" });
   });
 
   test("setup status runs without live credentials", async () => {

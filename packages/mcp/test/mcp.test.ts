@@ -61,6 +61,11 @@ test("context MCP tools are exposed", () => {
   expect(names).toContain("skyagent_context_events");
   expect(names).toContain("skyagent_context_watch");
   expect(names).toContain("skyagent_context_event_emit");
+  expect(names).toContain("skyagent_objective_create");
+  expect(names).toContain("skyagent_objective_list");
+  expect(names).toContain("skyagent_objective_update");
+  expect(names).toContain("skyagent_objective_complete");
+  expect(names).toContain("skyagent_objective_delete");
 });
 
 test("context get defaults to cached snapshot reads", async () => {
@@ -106,4 +111,26 @@ test("context event MCP tools emit and read events", async () => {
 
   expect(event.type).toBe("mcp.test_event");
   expect(batch.events).toContainEqual(expect.objectContaining({ id: event.id, type: "mcp.test_event" }));
+});
+
+test("objective MCP tools create and transition durable items", async () => {
+  isolatedSkyAgentHome();
+
+  const item = await callTool("skyagent_objective_create", {
+    itemKind: "snipe",
+    title: "Snipe Wither Relic",
+    itemId: "WITHER_RELIC",
+    targetPrice: 50_000_000,
+    priority: 8,
+    freshness: { status: "fresh", source: "coflnet", warnings: [{ code: "thin_market", message: "Thin market" }] },
+  });
+  const active = await callTool("skyagent_objective_update", { id: item.id, status: "active", sourceProvider: "coflnet" });
+  const list = await callTool("skyagent_objective_list", { itemKind: "snipe", status: "active" });
+
+  expect(active).toMatchObject({ id: item.id, status: "active", sourceProvider: "coflnet" });
+  expect(list.items).toContainEqual(expect.objectContaining({ id: item.id, itemId: "WITHER_RELIC", targetPrice: 50_000_000 }));
+
+  await callTool("skyagent_objective_complete", { id: item.id });
+  await callTool("skyagent_objective_delete", { id: item.id });
+  expect(await callTool("skyagent_objective_list", {})).toMatchObject({ count: 0, items: [] });
 });

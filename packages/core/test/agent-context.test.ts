@@ -45,6 +45,11 @@ describe("agent context capsule", () => {
         providers: [{ id: "pricing", status: "available", source: "test", cache: { entryCount: 1, staleCount: 0 } }],
         warnings: [],
       },
+      objectives: {
+        kind: "skyagent.objectiveSummary",
+        counts: { objective: 1, task: 1, buy: 0, source: 0, snipe: 0 },
+        active: [{ id: "objective_1", itemKind: "objective", title: "Prepare M5", status: "active" }],
+      },
       accessoriesProvider: async () => ({
         magicalPower: { estimated: 42, exact: false },
         owned: [{ internalId: "TALISMAN" }],
@@ -62,6 +67,7 @@ describe("agent context capsule", () => {
     expect(capsule.player.uuid).toBe(uuid);
     expect(capsule.economy.purse).toBe(123);
     expect(capsule.accessories).toMatchObject({ ownedCount: 1, activeCount: 1, missingCount: 1 });
+    expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ title: "Prepare M5" }));
     expect(capsule.pets.activePet).toMatchObject({ internalId: "SHEEP", active: true });
     expect(capsule.pets.items).toContainEqual(expect.objectContaining({ internalId: "SHEEP", active: true }));
     expect(capsule.followUpTools.inventory).toContain("skyblock_inventory_section");
@@ -78,6 +84,11 @@ describe("agent context capsule", () => {
         providers: [],
         warnings: [],
       },
+      objectives: {
+        kind: "skyagent.objectiveSummary",
+        counts: { objective: 0, task: 0, buy: 1, source: 0, snipe: 0 },
+        active: [{ id: "buy_1", itemKind: "buy", title: "Buy Wither Relic", status: "open" }],
+      },
     });
 
     expect(capsule.cache.status).toBe("refreshed");
@@ -86,6 +97,7 @@ describe("agent context capsule", () => {
     expect(capsule.accessories).toMatchObject({ magicalPower: null, ownedCount: null });
     expect(capsule.readiness.map((entry) => entry.area)).toEqual(["dungeons", "slayer", "kuudra", "garden", "mining"]);
     expect(capsule.warnings).toContainEqual(expect.objectContaining({ code: "snapshot_only_context" }));
+    expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ itemKind: "buy" }));
     expect(JSON.stringify(capsule)).not.toContain("secret-key");
   });
 
