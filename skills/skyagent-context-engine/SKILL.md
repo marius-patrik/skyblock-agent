@@ -4,7 +4,7 @@ description: Bootstrap and refresh SkyAgent session context for Hypixel SkyBlock
 metadata:
   display_name: "SkyAgent Context"
   short_description: "Bootstrap cached agent context."
-  default_prompt: "Use $skyagent-context-engine to load my current SkyBlock context capsule."
+  default_prompt: "Use $skyagent-context-engine to call skyagent_start and load my current SkyBlock context."
 ---
 
 # SkyAgent Context Engine
@@ -13,9 +13,9 @@ Use this skill when Codex needs the compact profile context before analysis, pla
 
 ## Tool Routing
 
-- Use `skyagent_start` when the user or host session needs an explicit SkyAgent startup hook. It should return setup status, selected player/profile, profile context freshness policy, compact context, server/API status, objective summary, recent event cursor, provider readiness, warnings, and follow-up tools while persisting an `agent.session_start` event.
+- Use `skyagent_start` for full session bootstrap, fresh `@SkyAgent` invocation, or a host/session-start hook. It should return setup status, selected player/profile, profile context freshness policy, compact context, server/API status, objective summary, recent events and cursor, provider readiness, warnings, and follow-up tools while persisting an `agent.session_start` event.
 - Use `skyagent_config_get` first when only player, UUID, selected profile, or API key setup metadata is needed before choosing a heavier context tool.
-- Use `skyagent_context_bootstrap` at session start only when `skyagent_start` is unavailable or a plain cached context capsule is enough. It should return compact identity, selected profile, profile snapshot, economy/networth summary, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tools.
+- Use `skyagent_context_bootstrap` only when `skyagent_start` is unavailable or a plain cached context capsule is enough. It should return compact identity, selected profile, profile snapshot, economy/networth summary, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tools.
 - Use `skyagent_context_get` for cached context when the user asks a follow-up and current profile state is not required.
 - Use `skyagent_context_refresh` when the user says they changed gear, pets, accessories, profile progress, objectives, or wants the current route recalculated.
 - Use `skyblock_profile_snapshot` only when a narrow profile-cache read is enough or when the context tool points to it as the next detail tool.
@@ -25,6 +25,7 @@ Use this skill when Codex needs the compact profile context before analysis, pla
 
 ## Rules
 
+- Do not ask for a Minecraft username before `skyagent_start` has checked configured identity/profile for a fresh SkyAgent session.
 - Prefer the context capsule over repeated raw profile pulls for broad answers.
 - Preserve `fetchedAt`, cache status, stale status, provider freshness, warnings, and follow-up tool hints.
 - Treat stale context as advisory unless the user explicitly accepts stale data or the answer is not freshness-sensitive.

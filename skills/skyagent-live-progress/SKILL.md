@@ -14,7 +14,7 @@ Use this skill when an answer should account for recent session progress, refres
 ## Tool Routing
 
 - Use `skyagent_start` through `$skyagent-context-engine` when a session should create the startup marker; it persists an `agent.session_start` event for reconnect and audit flows.
-- Use `skyagent_context_events` to read recent bounded context events for deterministic follow-up analysis.
+- Use `skyagent_context_events` to read recent bounded context events for deterministic follow-up analysis; prefer the `since` cursor returned by `skyagent_start` when continuing the same session.
 - Use `skyagent_context_watch` when the session needs a stream of progress, refresh, `provider.cache_status`, `provider.cache_status_change`, or server-status events.
 - Use `skyagent_context_event_emit` when Codex, CLI, MCP, gateway, or a future producer needs to add an explicit event.
 - Use `skyagent_server_status` when online state, SkyBlock session mode/map, Hypixel API availability, or status warnings matter; status changes should appear as `hypixel.server_status_change` events.

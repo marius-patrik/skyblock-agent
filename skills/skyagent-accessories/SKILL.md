@@ -20,7 +20,7 @@ Use this skill for talismans/accessories, Magical Power, accessory-bag state, ne
 - Use `skyblock_networth` when accessory decisions need full sectioned networth, purse/bank context, unknown prices, or the user's total coin position.
 - Use `skyblock_item_networth` for accessory-bag item networth, sectioned item networth, or when the user asks about one inventory section's coin value.
 - Pair with `skyblock_price` only when inspecting one candidate manually or verifying a surprising candidate price.
-- Use `$skyagent-context-engine` before broad Magical Power planning so objective summaries, coin position, provider freshness, and follow-up tools are loaded.
+- Use `$skyagent-context-engine` before broad Magical Power planning; prefer `skyagent_start` when no startup payload is present so objective summaries, coin position, server status, recent events, provider freshness, and follow-up tools are loaded.
 - Use `$skyagent-objectives` when accepted accessory upgrades should become buy-list entries, source-item entries, or snipe targets with target prices and warnings.
 - Use `$skyagent-live-progress` when recent purchases, profile refreshes, or provider/cache events may change owned accessories or prices.
 
