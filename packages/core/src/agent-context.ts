@@ -1,6 +1,6 @@
 import { calculateAccessoriesFromMember } from "./accessories.ts";
 import { inventorySectionFromMember } from "./inventory.ts";
-import { providerStatus } from "./providers.ts";
+import { emitContextEvent, providerStatusWithEvent } from "./context-events.ts";
 import { READINESS_AREAS, readinessFromContext } from "./readiness.ts";
 import { buildProfileSnapshot, profileSnapshotForPlayer, writeProfileSnapshot } from "./profile-cache.ts";
 import { fetchProfileContext } from "./profile.ts";
@@ -202,7 +202,7 @@ export async function buildAgentContext(context: any, options: Record<string, an
     (options.accessoriesProvider ?? calculateAccessoriesFromMember)(context.member, { budget: null }),
   ]);
   const readiness = READINESS_AREAS.map((area) => readinessFromContext(context, area));
-  const providers = options.providers ?? providerStatus();
+  const providers = options.providers ?? providerStatusWithEvent();
   const warnings = compactWarnings([
     ...(snapshot.warnings ?? []),
     ...(armor.warnings ?? []),
@@ -263,7 +263,7 @@ export async function buildAgentContext(context: any, options: Record<string, an
 
 export function buildAgentContextFromSnapshot(snapshot: any, options: Record<string, any> = {}) {
   const now = options.now ?? Date.now();
-  const providers = options.providers ?? providerStatus();
+  const providers = options.providers ?? providerStatusWithEvent();
   const cached = snapshot.agentContextSummary ?? {};
   return {
     kind: "skyagent.agentContext",
@@ -340,5 +340,18 @@ export async function agentContextForPlayer(player?: string, profile?: string, o
     snapshot,
   });
   writeProfileSnapshot(snapshotWithAgentContext(snapshot, capsule));
+  emitContextEvent({
+    type: "profile.snapshot_refresh",
+    source: { kind: "profile-snapshot", id: snapshot.profile?.profileId ?? null },
+    player: snapshot.player,
+    profile: snapshot.profile,
+    payload: {
+      cache: capsule.cache,
+      economy: capsule.economy,
+      inventoryApiSignals: capsule.inventoryApiSignals,
+    },
+    freshness: { status: "fresh", fetchedAt: capsule.generatedAt, source: "profile-snapshot", rateLimit: capsule.rateLimit },
+    provenance: { provider: "hypixel" },
+  });
   return capsule;
 }

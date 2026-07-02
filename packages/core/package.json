@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./accessories": "./src/accessories.ts",
     "./agent-context": "./src/agent-context.ts",
+    "./context-events": "./src/context-events.ts",
     "./hypixel": "./src/hypixel.ts",
     "./inventory": "./src/inventory.ts",
     "./items": "./src/items.ts",

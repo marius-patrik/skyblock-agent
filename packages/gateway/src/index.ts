@@ -4,6 +4,8 @@ import {
   accessoryUpgradesForPlayer,
   agentContextForPlayer,
   compactProfileOverview,
+  emitContextEvent,
+  emitProviderStatusEvent,
   fetchProfileContext,
   hypixelRequest,
   inventoryForPlayer,
@@ -20,9 +22,12 @@ import {
   progressionForPlayer,
   providerStatus,
   publicConfig,
+  readContextEvents,
   readinessForPlayer,
   resourceEndpoint,
+  serverStatusForPlayer,
   setConfigValue,
+  subscribeContextEvents,
   skyblockProfiles,
   uuidFromNameOrUuid,
   weightForPlayer,
@@ -55,6 +60,11 @@ type GatewayDeps = {
   resourceEndpoint: typeof resourceEndpoint;
   providerStatus: typeof providerStatus;
   agentContextForPlayer: (...args: Parameters<typeof agentContextForPlayer>) => Promise<any>;
+  serverStatusForPlayer: (...args: Parameters<typeof serverStatusForPlayer>) => Promise<any>;
+  readContextEvents: typeof readContextEvents;
+  emitContextEvent: typeof emitContextEvent;
+  emitProviderStatusEvent: typeof emitProviderStatusEvent;
+  subscribeContextEvents: typeof subscribeContextEvents;
 };
 
 export type GatewayOptions = {
@@ -96,6 +106,11 @@ const defaultDeps: GatewayDeps = {
   resourceEndpoint,
   providerStatus,
   agentContextForPlayer,
+  serverStatusForPlayer,
+  readContextEvents,
+  emitContextEvent,
+  emitProviderStatusEvent,
+  subscribeContextEvents,
 };
 
 const allowedResourceKinds = new Set(["collections", "skills", "items", "election", "bingo"]);
@@ -135,6 +150,10 @@ function numberQuery(url: URL, key: string) {
   if (value === undefined) return null;
   if (!value.trim()) return Number.NaN;
   return Number(value);
+}
+
+function sseEvent(event: any) {
+  return `id: ${event.sequence}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
 function playerProfile(url: URL) {
@@ -219,6 +238,58 @@ export function createGateway(options: GatewayOptions = {}) {
       if (url.pathname === "/context/refresh" && request.method === "POST") {
         const body = await parseJsonBody(request);
         return json({ ok: true, context: await deps.agentContextForPlayer(body.player, body.profile, { refresh: true }) });
+      }
+
+      if (url.pathname === "/server-status" && request.method === "GET") {
+        return json({ ok: true, status: await deps.serverStatusForPlayer(query(url, "player")) });
+      }
+
+      if (url.pathname === "/context/events" && request.method === "GET") {
+        return json({ ok: true, events: deps.readContextEvents({
+          sinceSequence: numberQuery(url, "since") ?? 0,
+          limit: numberQuery(url, "limit") ?? undefined,
+          type: query(url, "type"),
+        }) });
+      }
+
+      if (url.pathname === "/context/events" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json({ ok: true, event: deps.emitContextEvent({
+          type: body.type ?? "gateway.context_event",
+          source: body.source ?? { kind: "gateway", transport: "http" },
+          player: body.player,
+          profile: body.profile,
+          payload: body.payload ?? {},
+          freshness: { status: "local", source: "gateway" },
+        }) });
+      }
+
+      if (url.pathname === "/context/stream" && request.method === "GET") {
+        const encoder = new TextEncoder();
+        const sinceSequence = numberQuery(url, "since") ?? 0;
+        const limit = numberQuery(url, "limit") ?? 50;
+        let unsubscribe = () => {};
+        const stream = new ReadableStream({
+          start(controller) {
+            const batch = deps.readContextEvents({ sinceSequence, limit });
+            for (const event of batch.events) {
+              controller.enqueue(encoder.encode(sseEvent(event)));
+            }
+            unsubscribe = deps.subscribeContextEvents((event) => {
+              controller.enqueue(encoder.encode(sseEvent(event)));
+            });
+          },
+          cancel() {
+            unsubscribe();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "content-type": "text/event-stream; charset=utf-8",
+            "cache-control": "no-cache",
+            connection: "keep-alive",
+          },
+        });
       }
 
       if (url.pathname === "/inventory" && request.method === "GET") {
@@ -314,7 +385,9 @@ export function createGateway(options: GatewayOptions = {}) {
       }
 
       if (url.pathname === "/provider-status" && request.method === "GET") {
-        return json({ ok: true, providers: deps.providerStatus() });
+        const providers = deps.providerStatus();
+        deps.emitProviderStatusEvent(providers);
+        return json({ ok: true, providers });
       }
 
       if (url.pathname === "/resource" && request.method === "GET") {
@@ -443,6 +516,21 @@ export class GatewayClient {
     return this.request("/context/refresh", {
       method: "POST",
       body: JSON.stringify({ player, profile }),
+    });
+  }
+
+  serverStatus(player?: string) {
+    return this.request(queryPath("/server-status", { player }));
+  }
+
+  contextEvents(options: { since?: number; limit?: number; type?: string } = {}) {
+    return this.request(queryPath("/context/events", options));
+  }
+
+  emitContextEvent(event: Record<string, unknown>) {
+    return this.request("/context/events", {
+      method: "POST",
+      body: JSON.stringify(event),
     });
   }
 

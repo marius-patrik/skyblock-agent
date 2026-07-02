@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { agentContextForPlayer } from "@skyagent/core/agent-context";
+import { persistContextEvent, readPersistedContextEvents, serverStatusForPlayer, subscribeContextEvents } from "@skyagent/core/context-events";
 import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
@@ -26,6 +27,10 @@ function print(value, pretty = true) {
   process.stdout.write(`${JSON.stringify(value, null, pretty ? 2 : 0)}\n`);
 }
 
+function printLine(value) {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
 function usage() {
   process.stdout.write(`SkyAgent CLI
 
@@ -42,6 +47,9 @@ Usage:
   skyagent doctor [--json]
   skyagent context [nameOrUuid] [profileIdOrName] [--cache-only] [--allow-stale] [--ttl-ms <ms>]  # cached read
   skyagent context refresh [nameOrUuid] [profileIdOrName] [--ttl-ms <ms>]
+  skyagent context watch [--since <sequence>] [--limit <n>] [--once]
+  skyagent context emit [type] [--message <text>]
+  skyagent server-status [nameOrUuid]
   skyagent update check [--json] [--version <version>]
   skyagent update install [--json] [--version <version>] [--dry-run] [--restart <gateway|web|all>]
   skyagent resolve <minecraftName>
@@ -221,6 +229,46 @@ export function parseContextArgs(args) {
   };
 }
 
+async function watchContextEvents(args) {
+  let latestSequence = Number(optionValue(args, "--since") ?? 0);
+  const batch = readPersistedContextEvents({
+    sinceSequence: optionValue(args, "--since") ?? 0,
+    limit: optionValue(args, "--limit") ?? undefined,
+  });
+  latestSequence = Math.max(latestSequence, batch.latestSequence);
+  if (args.includes("--once")) {
+    print(batch);
+    return;
+  }
+
+  for (const event of batch.events) {
+    printLine(event);
+  }
+
+  await new Promise<void>((resolve) => {
+    const unsubscribe = subscribeContextEvents((event) => {
+      latestSequence = Math.max(latestSequence, event.sequence);
+      printLine(event);
+    });
+    const interval = setInterval(() => {
+      const nextBatch = readPersistedContextEvents({ sinceSequence: latestSequence });
+      latestSequence = Math.max(latestSequence, nextBatch.latestSequence);
+      for (const event of nextBatch.events) {
+        printLine(event);
+      }
+    }, 1_000);
+    function cleanup() {
+      clearInterval(interval);
+      unsubscribe();
+      process.off("SIGINT", cleanup);
+      process.off("SIGTERM", cleanup);
+      resolve();
+    }
+    process.once("SIGINT", cleanup);
+    process.once("SIGTERM", cleanup);
+  });
+}
+
 async function hiddenQuestion(prompt: string) {
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
     throw new Error("Hidden setup prompts require an interactive TTY. Use --api-key for non-interactive setup.");
@@ -382,6 +430,19 @@ export async function command(args) {
   }
 
   if (area === "context") {
+    if (action === "watch") {
+      await watchContextEvents(rest);
+      return;
+    }
+    if (action === "emit") {
+      print(persistContextEvent({
+        type: rest.find((arg) => !arg.startsWith("--")) ?? "cli.context_event",
+        source: { kind: "cli", transport: "command" },
+        payload: { message: optionValue(rest, "--message") ?? null },
+        freshness: { status: "local", source: "cli" },
+      }));
+      return;
+    }
     const parsed = parseContextArgs([action, ...rest].filter(Boolean));
     print(await agentContextForPlayer(parsed.values[0], parsed.values[1], {
       refresh: parsed.refresh,
@@ -389,6 +450,11 @@ export async function command(args) {
       allowStale: parsed.allowStale,
       ttlMs: parsed.ttlMs,
     }));
+    return;
+  }
+
+  if (area === "server-status") {
+    print(await serverStatusForPlayer(action));
     return;
   }
 

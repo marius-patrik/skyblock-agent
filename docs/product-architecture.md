@@ -79,7 +79,7 @@ Requirements:
 - Record PID, port, token metadata, started-at time, logs path, and version.
 - Refuse to print secrets in logs or status output.
 - Expose stable JSON APIs consumed by both TUI and web.
-- Provide WebSocket or server-sent events for refresh/progress later.
+- Provide server-sent events for refresh/progress/context updates.
 
 Initial routes:
 
@@ -98,7 +98,21 @@ GET  /readiness?area=&player=&profile=
 POST /plan
 GET  /providers
 POST /cache/refresh
+GET  /server-status?player=
+GET  /context/events?since=&limit=
+POST /context/events
+GET  /context/stream?since=&limit=
 ```
+
+## Context Event Contract
+
+The context engine stores bounded `skyagent.contextEvent` records with source, timestamp, optional player/profile identity, payload, freshness, provider provenance, and monotonic sequence IDs for reconnects. Initial producers include Hypixel server/status checks, profile snapshot refreshes, provider/cache status changes, CLI/MCP/gateway explicit events, and later objective progress. `skyagent context watch` streams newline-delimited events by default and keeps `--once` for deterministic agent/test reads. CLI explicit events are persisted to `context-events.ndjson` under SkyAgent home so separate CLI invocations can reconnect and read them.
+
+Hypixel server status reads and monitoring share the same reusable core producer. They emit `hypixel.server_status_change` when API availability, online state, session fields, or warning codes change, so CLI, MCP, gateway, and monitor callers all feed the same context stream. Long-running polling is started by host surfaces through `createServerStatusMonitor`; direct status reads remain non-interactive and emit the same change contract when state changes. Local input/configuration failures report `api.available: null`; provider/network failures report `api.available: false`; successful status responses include online state plus game type, mode, and map.
+
+Provider status reads emit `provider.cache_status` and `provider.cache_status_change`. The gateway provider route and agent context bootstrap both use this producer so cache/provider changes are visible to context watchers.
+
+Minecraft mod telemetry is reserved as a future producer through provenance metadata only. Expected future fields include `modId`, `minecraftVersion`, `sessionId`, `world`, `location`, `inventoryDelta`, and `objectiveProgress`; this repo slice does not implement the Fabric mod.
 
 ## TUI And Web
 

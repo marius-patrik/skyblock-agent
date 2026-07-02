@@ -154,6 +154,81 @@ test("profiles and overview routes use injected core contracts", async () => {
   expect(refreshed.context).toMatchObject({ player: "Notch", profile: "Apple", refresh: true });
 });
 
+test("server status and context event routes expose JSON and SSE contracts", async () => {
+  const events: any[] = [];
+  const listeners = new Set<(event: any) => void>();
+  const emit: any = (input) => {
+    const event = {
+      kind: "skyagent.contextEvent",
+      schemaVersion: 1,
+      id: `event-${events.length + 1}`,
+      sequence: events.length + 1,
+      type: input.type,
+      source: { kind: "gateway", id: null, transport: "http" },
+      timestamp: new Date(1_000 + events.length).toISOString(),
+      player: input.player ?? null,
+      profile: input.profile ?? null,
+      payload: input.payload ?? {},
+      freshness: { status: "local", fetchedAt: new Date(1_000 + events.length).toISOString(), source: "gateway", rateLimit: null, warnings: [] },
+      provenance: {
+        producer: "skyagent",
+        version: "context-event-v1",
+        provider: null,
+        futureProducer: { kind: "minecraft-mod-telemetry", status: "reserved", expectedFields: ["objectiveProgress"] },
+      },
+    };
+    events.push(event);
+    for (const listener of listeners) listener(event);
+    return event;
+  };
+  const gateway = createGateway({
+    token: "test-token",
+    deps: {
+      serverStatusForPlayer: async (player) => ({
+        kind: "skyagent.serverStatus",
+        player: { input: player, uuid: "uuid-1" },
+        api: { available: true, status: 200 },
+        online: true,
+        session: { gameType: "SKYBLOCK", mode: "dynamic", map: "Private Island" },
+        warnings: [],
+      }),
+      emitContextEvent: emit,
+      readContextEvents: ({ sinceSequence = 0, limit = 50 } = {}) => ({
+        kind: "skyagent.contextEventBatch",
+        schemaVersion: 1,
+        generatedAt: new Date(2_000).toISOString(),
+        sinceSequence: Number(sinceSequence),
+        events: events.filter((event) => event.sequence > Number(sinceSequence)).slice(-Number(limit)),
+        latestSequence: events.at(-1)?.sequence ?? 0,
+        limit: Number(limit),
+      }),
+      subscribeContextEvents: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+  });
+
+  const status = await gateway.handle(request("/server-status?player=Notch", "test-token")).then((response) => response.json());
+  expect(status.status).toMatchObject({ online: true, session: { gameType: "SKYBLOCK" } });
+
+  const emitted = await gateway.handle(request("/context/events", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ type: "gateway.test", payload: { ok: true } }),
+  })).then((response) => response.json());
+  expect(emitted.event).toMatchObject({ sequence: 1, type: "gateway.test" });
+
+  const batch = await gateway.handle(request("/context/events?since=0&limit=5", "test-token")).then((response) => response.json());
+  expect(batch.events.events).toContainEqual(expect.objectContaining({ type: "gateway.test" }));
+
+  const streamResponse = await gateway.handle(request("/context/stream?since=0&limit=1", "test-token"));
+  expect(streamResponse.headers.get("content-type")).toContain("text/event-stream");
+  const reader = streamResponse.body!.getReader();
+  const first = await reader.read();
+  await reader.cancel();
+  expect(new TextDecoder().decode(first.value)).toContain("event: gateway.test");
+});
+
 test("analysis routes mirror core contracts and preserve warnings", async () => {
   const warnings = ["inventory_api_disabled"];
   const gateway = createGateway({
@@ -227,6 +302,9 @@ test("gateway client exposes analysis route helpers", async () => {
   await client.inventorySection("armor", "Notch", "Apple");
   await client.context("Notch", "Apple");
   await client.refreshContext("Notch", "Apple");
+  await client.serverStatus("Notch");
+  await client.contextEvents({ since: 1, limit: 2 });
+  await client.emitContextEvent({ type: "client.test" });
   await client.normalizedItems("Notch", "Apple");
   await client.itemMetadata("ASPECT_OF_THE_END");
   await client.networth("Notch", "Apple");
@@ -246,6 +324,9 @@ test("gateway client exposes analysis route helpers", async () => {
   expect(paths).toContain("/inventory-section?section=armor&player=Notch&profile=Apple");
   expect(paths).toContain("/context?player=Notch&profile=Apple");
   expect(paths).toContain("/context/refresh");
+  expect(paths).toContain("/server-status?player=Notch");
+  expect(paths).toContain("/context/events?since=1&limit=2");
+  expect(paths).toContain("/context/events");
   expect(paths).toContain("/items/metadata?id=ASPECT_OF_THE_END");
   expect(paths).toContain("/provider-status");
   expect(paths).toContain("/resource?kind=items");

@@ -1,5 +1,6 @@
 import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
 import { agentContextForPlayer } from "@skyagent/core/agent-context";
+import { emitContextEvent, readContextEvents, serverStatusForPlayer } from "@skyagent/core/context-events";
 import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
@@ -99,6 +100,56 @@ export const tools = [
         player: { type: "string" },
         profile: { type: "string" },
         ttlMs: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_server_status",
+    description: "Return Hypixel API availability, player online status, and session mode/map when available.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_events",
+    description: "Read bounded SkyAgent context event history for reconnects, polling, and agent session state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sinceSequence: { type: "number" },
+        limit: { type: "number" },
+        type: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_watch",
+    description: "Read context events since a sequence for watch-style polling without opening a raw stream.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sinceSequence: { type: "number" },
+        limit: { type: "number" },
+        type: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_event_emit",
+    description: "Emit an explicit local context event from an MCP client or agent workflow.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string" },
+        player: { type: "object" },
+        profile: { type: "object" },
+        payload: { type: "object" },
+        source: { type: "object" },
       },
       additionalProperties: false,
     },
@@ -591,6 +642,20 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       return agentContextForPlayer(args.player, args.profile, {
         refresh: true,
         ttlMs: args.ttlMs,
+      });
+    case "skyagent_server_status":
+      return serverStatusForPlayer(args.player);
+    case "skyagent_context_events":
+    case "skyagent_context_watch":
+      return readContextEvents(args);
+    case "skyagent_context_event_emit":
+      return emitContextEvent({
+        type: args.type ?? "mcp.context_event",
+        source: args.source ?? { kind: "mcp", transport: "tool" },
+        player: args.player,
+        profile: args.profile,
+        payload: args.payload ?? {},
+        freshness: { status: "local", source: "mcp" },
       });
     case "minecraft_resolve_username":
       return resolveMinecraftUsername(args.username);

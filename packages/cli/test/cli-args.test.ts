@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
+import { emitContextEvent } from "@skyagent/core/context-events";
 import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
@@ -121,6 +122,58 @@ describe("CLI argument parsing", () => {
       refresh: true,
       values: ["Notch", "Apple"],
     });
+  });
+
+  test("context watch and emit commands run without live credentials", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["context", "emit", "cli.test", "--message", "hello"]);
+    await command(["context", "watch", "--since", "0", "--limit", "1", "--once"]);
+  });
+
+  test("context emit and watch share persisted events across CLI processes", async () => {
+    isolatedSkyAgentHome();
+    await command(["context", "emit", "cli.persisted_test", "--message", "hello"]);
+
+    const proc = Bun.spawn(["bun", "./scripts/skyagent.ts", "context", "watch", "--once", "--since", "0", "--limit", "5"], {
+      cwd: path.resolve(import.meta.dir, "../../.."),
+      env: { ...process.env, SKYAGENT_HOME: tempHome! },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toContain("cli.persisted_test");
+  });
+
+  test("context watch streams subscribed events until interrupted", async () => {
+    isolatedSkyAgentHome();
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      const watching = command(["context", "watch", "--since", "999999", "--limit", "1"]);
+      emitContextEvent({
+        type: "cli.stream_test",
+        source: { kind: "cli", transport: "test" },
+        payload: { ok: true },
+        freshness: { status: "local", source: "test" },
+      });
+      process.emit("SIGINT");
+      await watching;
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(writes.join("")).toContain("\"type\":\"cli.stream_test\"");
   });
 
   test("setup status runs without live credentials", async () => {

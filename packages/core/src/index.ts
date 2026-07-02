@@ -1,5 +1,6 @@
 export * from "./accessories.ts";
 export * from "./agent-context.ts";
+export * from "./context-events.ts";
 export * from "./hypixel.ts";
 export * from "./inventory.ts";
 export * from "./items.ts";

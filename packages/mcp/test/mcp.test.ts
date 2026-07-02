@@ -57,6 +57,10 @@ test("context MCP tools are exposed", () => {
   expect(names).toContain("skyagent_context_bootstrap");
   expect(names).toContain("skyagent_context_get");
   expect(names).toContain("skyagent_context_refresh");
+  expect(names).toContain("skyagent_server_status");
+  expect(names).toContain("skyagent_context_events");
+  expect(names).toContain("skyagent_context_watch");
+  expect(names).toContain("skyagent_context_event_emit");
 });
 
 test("context get defaults to cached snapshot reads", async () => {
@@ -88,4 +92,18 @@ test("context get defaults to cached snapshot reads", async () => {
   expect(result.kind).toBe("skyagent.agentContext");
   expect(result.cache.status).toBe("hit");
   expect(result.rawPayloadsIncluded).toBe(false);
+});
+
+test("context event MCP tools emit and read events", async () => {
+  const event = await callTool("skyagent_context_event_emit", {
+    type: "mcp.test_event",
+    payload: { ok: true },
+  });
+  const batch = await callTool("skyagent_context_watch", {
+    sinceSequence: event.sequence - 1,
+    limit: 5,
+  });
+
+  expect(event.type).toBe("mcp.test_event");
+  expect(batch.events).toContainEqual(expect.objectContaining({ id: event.id, type: "mcp.test_event" }));
 });
