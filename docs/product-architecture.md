@@ -98,7 +98,7 @@ GET  /networth?player=&profile=
 GET  /accessories?player=&profile=
 GET  /progression?player=&profile=
 GET  /readiness?area=&player=&profile=
-POST /plan
+GET  /plan
 GET  /providers
 POST /cache/refresh
 GET  /server-status?player=
@@ -261,6 +261,8 @@ The broad `$hypixel-skyblock` skill should route session-scale analysis through 
 The transcript-derived behavior contract lives in `docs/agent-behavior.md` and `packages/core/src/behavior-playbook.ts`. It requires compact startup context before broad analysis, fallback from MCP to CLI before claiming a missing capability, bounded raw extraction only when summaries are unavailable, Museum-specific extraction before generic progression, and complete gear/pet/accessory/freshness checks before damage or Slayer purchases.
 
 Skill additions and behavior changes require `bun run validate:skill` and a plugin manifest cachebuster bump so local Codex plugin installs can reload the updated skillset.
+
+The current public-readiness gap matrix lives in `docs/public-readiness-gaps.md`. It is the issue-owned source for remaining 2.0 blockers, important parity gaps, docs-only drift, and explicitly deferred web or Minecraft mod work.
 
 ## TUI And Web
 

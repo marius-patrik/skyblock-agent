@@ -217,7 +217,7 @@ Weight and readiness results are conservative. Exact Senither/Lily formulas are 
 
 Planner results compose profile sections, networth, accessory upgrades, readiness, config, and local memories into deterministic recommendations. Each recommendation includes a reason, expected impact, cost or time estimate, prerequisites, source freshness, uncertainty, and warnings.
 
-See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, `docs/parity-spec.md` for the detailed missing-parity implementation spec, and `docs/networth-comparison.md` for networth comparison-smoke notes.
+See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, `docs/public-readiness-gaps.md` for the 2.0 public-readiness issue map, `docs/parity-spec.md` for the detailed missing-parity implementation spec, and `docs/networth-comparison.md` for networth comparison-smoke notes.
 
 ## CI
 

@@ -1,8 +1,9 @@
 # SkyBlock Tool Parity
 
-SkyAgent currently covers official Hypixel API transport and light profile-viewer abstractions. It is not yet at SkyCrypt or Discord bot feature parity.
+SkyAgent covers official Hypixel API transport, profile context, inventory parsing, item normalization, economy estimates, progression sections, planning primitives, and local agent surfaces. It is still not at full SkyCrypt or Discord bot feature parity.
 
 For the detailed implementation spec and future issue slices, see `docs/parity-spec.md`.
+For the current 2.0 public-readiness gap map and owning issues, see `docs/public-readiness-gaps.md`.
 
 ## Covered
 
@@ -13,6 +14,8 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 - Public economy/event surfaces: Bazaar, auctions, ended auctions, fire sales.
 - Compact profile summaries, selected member extraction, overview metadata, and SkyCrypt URL generation.
 - Local config and memory storage outside the repo.
+- Inventory decoding for base64 gzipped NBT fields, including current and legacy inventory sections, wardrobe/loadout armor, backpacks, accessory bag, personal vault, and pets when exposed by the profile payload.
+- Deterministic item normalization for common SkyBlock item records, including IDs, rarity/category/count, reforges, enchantments, attributes, gemstones, dungeon modifiers, recombobulation, pet info, and metadata provider provenance where available.
 - Conservative sectioned networth for purse, bank, and resolved direct item prices, with unknown prices and assumptions surfaced.
 - Accessory bag analysis with duplicate detection, recombobulation/enrichment signals, estimated Magical Power, missing accessories when metadata is available, and price-driven coin-per-MP upgrade ranking.
 - Shared progression section framework with skill, Catacombs, Slayer XP curves plus sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Outputs include source fields, missing-data warnings, formulas/tables, and provenance.
@@ -22,14 +25,14 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 
 ## Missing for SkyCrypt-Style Parity
 
-- Inventory decoding for base64 gzipped NBT fields.
-- Item normalization, enchantments, attributes, reforges, gemstones, stars, dungeon quality, and item lore parsing.
-- Armor, equipment, weapons, wardrobe, inventory, ender chest, backpack, vault, and accessory bag section views.
 - SkyCrypt/SkyHelper-grade networth calculation, including modifier, pet-level, skin, dye, museum, and miscellaneous valuables.
 - SkyHelper-grade missing accessories when a full maintained accessory universe is unavailable.
+- Compact startup context that includes all hidden storage, sacks, Museum signals, profile availability flags, and coop/member provenance.
+- Museum donation planning that ranks already-owned, hidden-owned, missing, buy, source, and snipe candidates.
 - Full profile-viewer depth inside each progression section, including detailed SkyCrypt-grade UI breakdowns, per-floor dungeon badges, exact Garden milestone tables, full Museum item valuation, and richer Crimson Isle/Rift objective readiness.
 - Exact Senither/Lily weight parity and maintained reference-formula synchronization.
-- Deep goal-specific route optimization with exact gear, pet, class, party-finder, and time-to-complete models.
+- Gear-aware target readiness for specific Slayer bosses/tiers, Dungeon floors, Kuudra tiers, and damage goals.
+- Deep goal-specific route optimization with exact gear, pet, class, party-finder, money route, farming crop, and time-to-complete models.
 - Historical price sources and full lowest-BIN search beyond bounded auction-page scans.
 
 ## Current Networth Limits
@@ -57,8 +60,9 @@ For the detailed implementation spec and future issue slices, see `docs/parity-s
 
 ## Next Implementation Layers
 
-1. Add an inventory/NBT parser and section extractors.
-2. Add item metadata from NotEnoughUpdates or another maintained item dataset.
-3. Add price providers for Bazaar, lowest BIN, and optional third-party historical prices.
-4. Add networth and missing-accessory calculators.
-5. Deepen implemented profile modules with exact SkyCrypt/SkyHelper formulas, maintained metadata tables, readiness scoring, and weight calculations.
+1. Expand compact startup context with hidden storage, Museum, sacks, coop, and availability signals.
+2. Add Museum donation planning with hidden-owned candidate routing and bounded pricing.
+3. Upgrade readiness into target-aware gear, pet, accessory, modifier, and budget checks.
+4. Add route-specific planner modules for money, farming, Dungeon, Kuudra, buy, source, and snipe planning.
+5. Deepen provider metadata for pet levels, skins, dyes, Museum eligibility/value, accessory families, item modifiers, and price confidence.
+6. Add cross-surface parity tests so CLI, MCP, gateway, TUI, docs, and skills stay aligned.
