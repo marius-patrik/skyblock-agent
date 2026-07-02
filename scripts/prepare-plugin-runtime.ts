@@ -44,6 +44,7 @@ const shims: PackageShim[] = [
       "./readiness": "src/readiness.ts",
       "./sections": "src/sections/index.ts",
       "./setup": "src/setup.ts",
+      "./start": "src/start.ts",
       "./store": "src/store.ts",
       "./weight": "src/weight.ts",
     },

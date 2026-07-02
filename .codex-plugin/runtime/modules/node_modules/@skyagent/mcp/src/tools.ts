@@ -69,6 +69,25 @@ export const tools = [
     },
   },
   {
+    name: "skyagent_start",
+    description: "Start a SkyAgent agent session, collect setup/profile/status/objective/provider context, and persist an agent.session_start context event.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        refresh: { type: "boolean" },
+        cacheOnly: { type: "boolean" },
+        allowStale: { type: "boolean" },
+        ttlMs: { type: "number" },
+        sinceSequence: { type: "number" },
+        limit: { type: "number" },
+        type: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "skyagent_context_bootstrap",
     description: "Read a cached compact SkyAgent session-start context capsule with profile identity, gear/pet/accessory/readiness summaries, provider freshness, warnings, and follow-up tools.",
     inputSchema: {
@@ -767,6 +786,22 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
     case "skyagent_memory_delete": {
       const { deleteMemory } = await import("@skyagent/core/store");
       return deleteMemory(args.id);
+    }
+    case "skyagent_start": {
+      const { startSkyAgentSession } = await import("@skyagent/core/start");
+      return startSkyAgentSession({
+        player: args.player,
+        profile: args.profile,
+        refresh: Boolean(args.refresh),
+        cacheOnly: Object.prototype.hasOwnProperty.call(args, "cacheOnly") ? Boolean(args.cacheOnly) : undefined,
+        allowStale: Boolean(args.allowStale),
+        ttlMs: args.ttlMs,
+        sinceSequence: args.sinceSequence,
+        limit: args.limit,
+        type: args.type,
+        sourceKind: "mcp",
+        sourceTransport: "tool",
+      });
     }
     case "skyagent_context_bootstrap":
     case "skyagent_context_get": {

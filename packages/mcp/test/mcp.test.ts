@@ -58,6 +58,7 @@ test("profile snapshot MCP tool can return cached context deterministically", as
 test("context MCP tools are exposed", () => {
   const names = tools.map((tool) => tool.name);
 
+  expect(names).toContain("skyagent_start");
   expect(names).toContain("skyagent_context_bootstrap");
   expect(names).toContain("skyagent_context_get");
   expect(names).toContain("skyagent_context_refresh");
@@ -179,6 +180,47 @@ test("context get defaults to cached snapshot reads", async () => {
   expect(result.kind).toBe("skyagent.agentContext");
   expect(result.cache.status).toBe("hit");
   expect(result.rawPayloadsIncluded).toBe(false);
+});
+
+test("start MCP tool returns cached context and persists a session event", async () => {
+  isolatedSkyAgentHome();
+  const fetchedAtMs = Date.now();
+  writeProfileSnapshot(buildProfileSnapshot({
+    uuid,
+    profile: {
+      profile_id: "profile-1",
+      cute_name: "Apple",
+      selected: true,
+      members: {},
+    },
+    member: {
+      currencies: { coin_purse: 12 },
+      player_data: { experience: {} },
+      pets_data: { pets: [{ type: "SHEEP", active: true, exp: 10 }] },
+    },
+    profiles: [],
+    rateLimit: null,
+  }, { ttlMs: 60_000, fetchedAtMs }));
+
+  const result = await callTool("skyagent_start", {
+    player: uuid,
+    profile: "Apple",
+    cacheOnly: true,
+    ttlMs: 60_000,
+    sinceSequence: 0,
+    limit: 10,
+  });
+  const batch = await callTool("skyagent_context_watch", {
+    sinceSequence: result.sessionEvent.sequence - 1,
+    limit: 5,
+  });
+
+  expect(result.kind).toBe("skyagent.startup");
+  expect(result.context.kind).toBe("skyagent.agentContext");
+  expect(result.context.cache.status).toBe("hit");
+  expect(result.sessionEvent.type).toBe("agent.session_start");
+  expect(result.rawPayloadsIncluded).toBe(false);
+  expect(batch.events).toContainEqual(expect.objectContaining({ id: result.sessionEvent.id, type: "agent.session_start" }));
 });
 
 test("context event MCP tools emit and read events", async () => {

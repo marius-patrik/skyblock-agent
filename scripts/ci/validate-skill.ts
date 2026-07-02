@@ -181,6 +181,7 @@ export function validateSkills() {
 
   const contextSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-context-engine", "SKILL.md"), "utf8");
   for (const expected of [
+  "skyagent_start",
   "skyagent_context_bootstrap",
   "skyagent_context_get",
   "skyagent_context_refresh",
@@ -218,6 +219,7 @@ export function validateSkills() {
 
   const liveProgressSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-live-progress", "SKILL.md"), "utf8");
   for (const expected of [
+  "agent.session_start",
   "skyagent_context_events",
   "skyagent_context_watch",
   "skyagent_context_event_emit",

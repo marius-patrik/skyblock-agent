@@ -136,6 +136,8 @@ function runIsolatedCacheProbe() {
     const importProbe = [
       'await import("@skyagent/core/sections");',
       'await import("@skyagent/core/inventory");',
+      'const start = await import("@skyagent/core/start");',
+      'if (typeof start.startSkyAgentSession !== "function") throw new Error("missing startSkyAgentSession export");',
       'const nbt = await import("prismarine-nbt");',
       'if (typeof nbt.parse !== "function") throw new Error("missing prismarine-nbt parse");',
     ].join(" ");
@@ -163,6 +165,7 @@ function runIsolatedCacheProbe() {
       fail(`isolated no-node_modules MCP probe failed\n${mcpResult.stdout}\n${mcpResult.stderr}`);
     }
     for (const toolName of [
+      "skyagent_start",
       "skyagent_context_bootstrap",
       "skyagent_context_refresh",
       "skyagent_server_status",
@@ -170,6 +173,28 @@ function runIsolatedCacheProbe() {
     ]) {
       if (!mcpResult.stdout.includes(toolName)) {
         fail(`isolated no-node_modules MCP probe did not list ${toolName}`);
+      }
+    }
+
+    const mcpStartInput = [
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "skyagent-ci", version: "0.0.0" } } }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "skyagent_start", arguments: { limit: 1 } } }),
+      "",
+    ].join("\n");
+    const mcpStartResult = spawnSync("bun", ["./scripts/mcp-server.ts", "--cache-runtime"], {
+      cwd: probeRoot,
+      encoding: "utf8",
+      env: { ...process.env, SKYAGENT_HOME: path.join(probeRoot, "skyagent-home") },
+      input: mcpStartInput,
+      timeout: 10_000,
+    });
+    if (mcpStartResult.status !== 0) {
+      fail(`isolated no-node_modules MCP skyagent_start probe failed\n${mcpStartResult.stdout}\n${mcpStartResult.stderr}`);
+    }
+    for (const expected of ["skyagent.startup", "agent.session_start", "rawPayloadsIncluded"]) {
+      if (!mcpStartResult.stdout.includes(expected)) {
+        fail(`isolated no-node_modules MCP skyagent_start probe did not return ${expected}`);
       }
     }
   } finally {

@@ -17,5 +17,6 @@ export * from "./providers.ts";
 export * from "./readiness.ts";
 export * from "./sections/index.ts";
 export * from "./setup.ts";
+export * from "./start.ts";
 export * from "./store.ts";
 export * from "./weight.ts";

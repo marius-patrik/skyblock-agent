@@ -13,6 +13,7 @@ Use this skill when an answer should account for recent session progress, refres
 
 ## Tool Routing
 
+- Use `skyagent_start` through `$skyagent-context-engine` when a session should create the startup marker; it persists an `agent.session_start` event for reconnect and audit flows.
 - Use `skyagent_context_events` to read recent bounded context events for deterministic follow-up analysis.
 - Use `skyagent_context_watch` when the session needs a stream of progress, refresh, `provider.cache_status`, `provider.cache_status_change`, or server-status events.
 - Use `skyagent_context_event_emit` when Codex, CLI, MCP, gateway, or a future producer needs to add an explicit event.
@@ -24,6 +25,7 @@ Use this skill when an answer should account for recent session progress, refres
 ## Event Handling
 
 - Prefer event sequence IDs or `since` cursors for reconnects.
+- Treat `agent.session_start` as the boundary for the current agent run and use its payload to avoid repeating setup/profile/status checks.
 - Treat `provider.cache_status` and `provider.cache_status_change` events as freshness signals, not as proof that profile state changed.
 - Treat explicit agent events as notes unless they are backed by a tool result, live profile refresh, or user confirmation.
 - Future Minecraft mod telemetry should enter through the same event contract with provenance fields such as `modId`, `minecraftVersion`, `sessionId`, `world`, `location`, `inventoryDelta`, and `objectiveProgress`.

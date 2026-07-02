@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -189,6 +189,29 @@ describe("CLI argument parsing", () => {
       refresh: true,
       values: ["Notch", "Apple"],
     });
+  });
+
+  test("start parses profile bootstrap controls", () => {
+    expect(parseStartArgs(["Notch", "Apple", "--json", "--cache-only", "--allow-stale", "--ttl-ms", "60000"])).toEqual({
+      json: true,
+      refresh: false,
+      cacheOnly: true,
+      allowStale: true,
+      ttlMs: 60_000,
+      values: ["Notch", "Apple"],
+    });
+    expect(parseStartArgs(["--refresh"])).toMatchObject({
+      json: false,
+      refresh: true,
+      cacheOnly: false,
+      values: [],
+    });
+  });
+
+  test("start command reports setup gaps without live credentials", async () => {
+    isolatedSkyAgentHome();
+
+    await command(["start", "--json"]);
   });
 
   test("context watch and emit commands run without live credentials", async () => {

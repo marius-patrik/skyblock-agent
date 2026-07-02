@@ -20,6 +20,7 @@ import { compactProfileOverview, fetchProfileContext, profileSummaries, skycrypt
 import { readinessForPlayer } from "@skyagent/core/readiness";
 import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/sections";
 import { runSetup, setupStatus } from "@skyagent/core/setup";
+import { startSkyAgentSession } from "@skyagent/core/start";
 import { weightForPlayer } from "@skyagent/core/weight";
 import { gatewayCommand } from "./gateway.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "./update.ts";
@@ -50,6 +51,7 @@ Usage:
   skyagent provider config set <provider|base-url|model|api-key|timeout-ms|max-retries|rate-limit-rpm|rate-limit-tpm|budget-usd|budget-window> <value> [--json]
   skyagent version [--json]
   skyagent doctor [--json]
+  skyagent start [nameOrUuid] [profileIdOrName] [--json] [--refresh|--cache-only] [--allow-stale] [--ttl-ms <ms>]
   skyagent context [nameOrUuid] [profileIdOrName] [--cache-only] [--allow-stale] [--ttl-ms <ms>]  # cached read
   skyagent context refresh [nameOrUuid] [profileIdOrName] [--ttl-ms <ms>]
   skyagent context watch [--since <sequence>] [--limit <n>] [--once]
@@ -291,6 +293,18 @@ export function parseContextArgs(args) {
     cacheOnly: args.includes("--cache-only"),
     allowStale: args.includes("--allow-stale"),
     ttlMs: ttl === null ? undefined : Number(ttl),
+  };
+}
+
+export function parseStartArgs(args) {
+  const ttl = optionValue(args, "--ttl-ms");
+  return {
+    json: args.includes("--json"),
+    refresh: args.includes("--refresh"),
+    cacheOnly: args.includes("--cache-only"),
+    allowStale: args.includes("--allow-stale"),
+    ttlMs: ttl === null ? undefined : Number(ttl),
+    values: positionalArgs(args, ["--ttl-ms"]),
   };
 }
 
@@ -575,6 +589,21 @@ export async function command(args) {
   if (area === "doctor") {
     const compact = [action, ...rest].includes("--json");
     print(doctorStatus(), !compact);
+    return;
+  }
+
+  if (area === "start") {
+    const parsed = parseStartArgs([action, ...rest].filter(Boolean));
+    print(await startSkyAgentSession({
+      player: parsed.values[0],
+      profile: parsed.values[1],
+      refresh: parsed.refresh,
+      cacheOnly: parsed.cacheOnly ? true : undefined,
+      allowStale: parsed.allowStale,
+      ttlMs: parsed.ttlMs,
+      sourceKind: "cli",
+      sourceTransport: "command",
+    }), !parsed.json);
     return;
   }
 
