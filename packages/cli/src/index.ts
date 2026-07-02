@@ -11,6 +11,7 @@ import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
+import { profileSnapshotForPlayer } from "@skyagent/core/profile-cache";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 import { readinessForPlayer } from "@skyagent/core/readiness";
 import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/sections";
@@ -46,6 +47,7 @@ Usage:
   skyagent profiles [nameOrUuid]
   skyagent profiles-summary [nameOrUuid]
   skyagent profile [profileId]
+  skyagent profile-snapshot [nameOrUuid] [profileIdOrName] [--refresh] [--cache-only] [--allow-stale] [--ttl-ms <ms>]
   skyagent member [nameOrUuid] [profileIdOrName]
   skyagent overview [nameOrUuid] [profileIdOrName]
   skyagent inventory [nameOrUuid] [profileIdOrName] [--debug-raw]
@@ -191,6 +193,17 @@ export function parseSetupArgs(args) {
     username: optionValue(args, "--username"),
     apiKey: optionValue(args, "--api-key"),
     profile: optionValue(args, "--profile"),
+  };
+}
+
+export function parseProfileSnapshotArgs(args) {
+  const ttl = optionValue(args, "--ttl-ms");
+  return {
+    values: positionalArgs(args, ["--ttl-ms"]),
+    refresh: args.includes("--refresh"),
+    cacheOnly: args.includes("--cache-only"),
+    allowStale: args.includes("--allow-stale"),
+    ttlMs: ttl === null ? undefined : Number(ttl),
   };
 }
 
@@ -434,6 +447,17 @@ export async function command(args) {
       profiles: profileSummaries(response.body?.profiles ?? [], uuid),
       rateLimit: response.rateLimit,
     });
+    return;
+  }
+
+  if (area === "profile-snapshot") {
+    const parsed = parseProfileSnapshotArgs([action, ...rest].filter(Boolean));
+    print(await profileSnapshotForPlayer(parsed.values[0], parsed.values[1], {
+      refresh: parsed.refresh,
+      cacheOnly: parsed.cacheOnly,
+      allowStale: parsed.allowStale,
+      ttlMs: parsed.ttlMs,
+    }));
     return;
   }
 

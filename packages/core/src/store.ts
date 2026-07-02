@@ -43,6 +43,7 @@ export function readJson(file, fallback) {
 
 export function writeJson(file, value) {
   ensureDataDir();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 

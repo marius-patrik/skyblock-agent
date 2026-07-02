@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseSetupArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -89,6 +89,23 @@ describe("CLI argument parsing", () => {
       username: "Pastik_",
       apiKey: "secret",
       profile: "Apple",
+    });
+  });
+
+  test("profile-snapshot parses deterministic cache controls", () => {
+    expect(parseProfileSnapshotArgs(["Notch", "Apple", "--refresh", "--ttl-ms", "60000"])).toEqual({
+      values: ["Notch", "Apple"],
+      refresh: true,
+      cacheOnly: false,
+      allowStale: false,
+      ttlMs: 60_000,
+    });
+    expect(parseProfileSnapshotArgs(["--cache-only", "--allow-stale", "Notch"])).toEqual({
+      values: ["Notch"],
+      refresh: false,
+      cacheOnly: true,
+      allowStale: true,
+      ttlMs: undefined,
     });
   });
 
