@@ -3,7 +3,8 @@
     "skyagent": {
       "command": "bun",
       "args": [
-        "./scripts/mcp-server.ts"
+        "./scripts/mcp-server.ts",
+        "--cache-runtime"
       ],
       "env": {
         "HYPIXEL_API_KEY": "${HYPIXEL_API_KEY}"

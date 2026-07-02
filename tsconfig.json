@@ -17,10 +17,13 @@
         "packages/cli/src/index.ts"
       ],
       "@skyagent/core": [
-        "packages/core/src/index.ts"
+        "packages/core/src/index.ts",
+        ".codex-plugin/runtime/modules/node_modules/@skyagent/core/index.ts"
       ],
       "@skyagent/core/*": [
-        "packages/core/src/*.ts"
+        "packages/core/src/*.ts",
+        "packages/core/src/*/index.ts",
+        ".codex-plugin/runtime/modules/node_modules/@skyagent/core/*.ts"
       ],
       "@skyagent/gateway": [
         "packages/gateway/src/index.ts"
@@ -29,13 +32,18 @@
         "packages/gateway/src/manager.ts"
       ],
       "@skyagent/mcp": [
-        "packages/mcp/src/index.ts"
+        "packages/mcp/src/index.ts",
+        ".codex-plugin/runtime/modules/node_modules/@skyagent/mcp/index.ts"
       ],
       "@skyagent/tui": [
         "packages/tui/src/index.tsx"
       ],
       "@skyagent/web": [
         "packages/web/src/main.tsx"
+      ],
+      "prismarine-nbt": [
+        ".codex-plugin/runtime/modules/node_modules/prismarine-nbt/nbt.js",
+        "node_modules/prismarine-nbt/nbt.js"
       ]
     },
     "jsx": "react-jsx",
