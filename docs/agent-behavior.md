@@ -48,10 +48,10 @@ Agents should attempt the best supported fallback before saying SkyAgent cannot 
 Museum goals must not fall back to generic progression first. Route them through Museum state, hidden item/storage checks, and prices:
 
 1. Bootstrap context and objectives.
-2. Use `skyblock_profile_section` with `museum`.
-3. Fall back to `skyblock_museum`, `hypixel_request` for `skyblock/museum`, or bounded member extraction.
-4. Inspect inventory, ender chest, backpacks, personal vault, wardrobe, pets, accessory bag, and normalized item records for hidden donation candidates.
-5. Price candidate donations before suggesting buys, source items, or snipes.
+2. Use `skyblock_museum_donation_plan` for already-donated, eligible-owned, hidden-owned, missing, buy, source, and snipe candidates.
+3. Use `skyblock_profile_section` with `museum` for compact value/progress evidence.
+4. Fall back to `skyblock_museum`, `hypixel_request` for `skyblock/museum`, or bounded member extraction only for planner-missing fields.
+5. Inspect inventory, ender chest, backpacks, personal vault, wardrobe, pets, accessory bag, and normalized item records only as follow-up evidence when the planner reports uncertain candidates.
 
 Damage and Slayer goals must inspect complete readiness before purchases:
 

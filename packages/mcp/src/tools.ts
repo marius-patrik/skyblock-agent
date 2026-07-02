@@ -558,6 +558,24 @@ export const tools = [
     },
   },
   {
+    name: "skyblock_museum_donation_plan",
+    description: "Build a bounded Museum donation plan from selected profile Museum state and owned inventory/storage candidates. Returns owned, hidden-owned, missing, buy, source, and snipe candidates without persisting objectives unless explicitly requested.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        goal: { type: "string" },
+        player: { type: "string" },
+        profile: { type: "string" },
+        budget: { type: "number" },
+        maxPriceLookups: { type: "number", minimum: 0 },
+        timeoutMs: { type: "number", minimum: 1 },
+        persistObjectives: { type: "boolean" },
+      },
+      required: ["goal"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "skyblock_next_upgrades",
     description: "Rank budget-constrained next upgrade recommendations, currently centered on accessory Magical Power upgrades with explicit price freshness and warnings. Requires API key.",
     inputSchema: {
@@ -754,6 +772,17 @@ export function textResult(value) {
 }
 
 export async function callTool(name: string, args: Record<string, any> = {}) {
+  const finiteBound = (key: string, min: number, integer = false) => {
+    if (args[key] === undefined) {
+      return;
+    }
+    if (!Number.isFinite(args[key]) || args[key] < min) {
+      throw new Error(`${key} must be a finite number greater than or equal to ${min}.`);
+    }
+    if (integer && !Number.isInteger(args[key])) {
+      throw new Error(`${key} must be an integer.`);
+    }
+  };
   switch (name) {
     case "skyagent_config_get": {
       const { publicConfig } = await import("@skyagent/core/store");
@@ -1012,6 +1041,21 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
         networthTimeoutMs: args.networthTimeoutMs,
         maxPriceLookups: args.maxPriceLookups,
         accessoryTimeoutMs: args.accessoryTimeoutMs,
+      });
+      }
+    case "skyblock_museum_donation_plan":
+      if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
+        throw new Error("budget must be a non-negative finite number when provided.");
+      }
+      finiteBound("maxPriceLookups", 0, true);
+      finiteBound("timeoutMs", 1, true);
+      {
+      const { museumDonationPlanForPlayer } = await import("@skyagent/core/museum");
+      return museumDonationPlanForPlayer(args.goal, args.player, args.profile, {
+        budget: args.budget ?? null,
+        maxPriceLookups: args.maxPriceLookups,
+        timeoutMs: args.timeoutMs,
+        persistObjectives: args.persistObjectives,
       });
       }
     case "skyblock_next_upgrades":

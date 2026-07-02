@@ -7,7 +7,7 @@ import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
 import { stopGatewayProcess } from "@skyagent/gateway/manager";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseMuseumPlanArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -195,6 +195,60 @@ describe("CLI argument parsing", () => {
 
   test("plan validates budget before fetching profile data", async () => {
     await expect(command(["plan", "f7", "--budget", "-1"])).rejects.toThrow("Usage: skyagent plan");
+  });
+
+  test("museum-plan parses goal player profile budget and bounds", () => {
+    expect(parseMuseumPlanArgs(["Museum GIANTS_SWORD", "Notch", "Apple", "--budget", "1000000", "--max-price-lookups", "5", "--timeout-ms", "500", "--persist-objectives"])).toEqual({
+      goal: "Museum GIANTS_SWORD",
+      budget: 1_000_000,
+      values: ["Notch", "Apple"],
+      maxPriceLookups: 5,
+      timeoutMs: 500,
+      persistObjectives: true,
+    });
+    expect(parseMuseumPlanArgs(["Museum TERMINATOR"])).toEqual({
+      goal: "Museum TERMINATOR",
+      budget: null,
+      values: [],
+      maxPriceLookups: 25,
+      timeoutMs: 8_000,
+      persistObjectives: false,
+    });
+    expect(parseMuseumPlanArgs(["Museum", "GIANTS_SWORD", "Notch", "Apple"])).toEqual({
+      goal: "Museum GIANTS_SWORD",
+      budget: null,
+      values: ["Notch", "Apple"],
+      maxPriceLookups: 25,
+      timeoutMs: 8_000,
+      persistObjectives: false,
+    });
+    expect(parseMuseumPlanArgs(["giant", "sword", "Notch"])).toEqual({
+      goal: "giant sword",
+      budget: null,
+      values: ["Notch"],
+      maxPriceLookups: 25,
+      timeoutMs: 8_000,
+      persistObjectives: false,
+    });
+    expect(parseMuseumPlanArgs(["giant", "Sword", "Notch", "Apple"])).toEqual({
+      goal: "giant Sword",
+      budget: null,
+      values: ["Notch", "Apple"],
+      maxPriceLookups: 25,
+      timeoutMs: 8_000,
+      persistObjectives: false,
+    });
+    expect(parseMuseumPlanArgs(["Museum", "Giant", "Sword", "Notch", "Apple"])).toEqual({
+      goal: "Museum Giant Sword",
+      budget: null,
+      values: ["Notch", "Apple"],
+      maxPriceLookups: 25,
+      timeoutMs: 8_000,
+      persistObjectives: false,
+    });
+    expect(() => parseMuseumPlanArgs(["Museum TERMINATOR", "--max-price-lookups", "nope"])).toThrow("--max-price-lookups must be a finite number");
+    expect(() => parseMuseumPlanArgs(["Museum TERMINATOR", "--max-price-lookups", "1.5"])).toThrow("--max-price-lookups must be an integer");
+    expect(() => parseMuseumPlanArgs(["Museum TERMINATOR", "--timeout-ms", "0"])).toThrow("--timeout-ms must be a finite number");
   });
 
   test("setup parses non-interactive flags", () => {

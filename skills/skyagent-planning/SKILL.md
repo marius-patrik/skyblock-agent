@@ -14,6 +14,7 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 ## Tool Routing
 
 - Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, prerequisites, immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, and what to skip. Set `useContext: true` for broad planning so cached profile/objective state is included before pulling raw details.
+- Use `skyblock_museum_donation_plan` for Museum donation goals before generic planning. It returns already-donated, eligible-owned, hidden-owned, missing, uncertain, buy, source, and snipe candidates with bounded price warnings and storage evidence.
 - Include `budget` when the user gives coins available.
 - Use `skyblock_next_upgrades` for purchase ranking before recommending buys.
 - Use planner bounds (`maxItems`, `networthTimeoutMs`, `maxPriceLookups`, `accessoryTimeoutMs`) for broad plans so networth/accessory fanout cannot block the session indefinitely.
@@ -22,7 +23,7 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 - Route context/session bootstrap to `$skyagent-context-engine`, durable plan tracking to `$skyagent-objectives`, and recent progress/event-stream checks to `$skyagent-live-progress`.
 - Pull supporting detail with `skyblock_profile_snapshot`, `skyblock_profile_overview`, `skyblock_progression`, `skyblock_readiness`, `skyblock_networth`, `skyblock_accessories`, `skyblock_price`, or `skyblock_price_history` when the plan output needs profile, economy, progression, readiness, or price context. Prefer the snapshot cache for repeated planning passes and refresh it when current progress matters.
 - Route patch-sensitive gear, money-making, class, boss, or route claims to `$skyagent-provider-maintenance` before making strong recommendations.
-- For Museum goals, inspect `skyblock_profile_section` with `museum`, fall back to `skyblock_museum` or bounded raw extraction, inspect hidden inventory/storage/wardrobe candidates, and price candidates before recommending buys.
+- For Museum goals, call `skyblock_museum_donation_plan` first. Use `skyblock_profile_section` with `museum`, `skyblock_museum`, or bounded raw extraction only when the planner reports missing or uncertain fields that need follow-up.
 - For damage or Slayer goals, check readiness, armor/equipment/current inventory, wardrobe/storage/museum signals, pets, accessories/Magical Power, budget, prices, and provider freshness before recommending purchases.
 
 ## Rules

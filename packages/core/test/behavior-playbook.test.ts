@@ -19,20 +19,20 @@ test("behavior playbook bootstraps compact context before broad planning", () =>
   ]);
 });
 
-test("behavior smoke routes museum goals to museum extraction before generic progression planning", () => {
+test("behavior smoke routes museum goals to donation planner before generic progression planning", () => {
   const tools = skyAgentBehaviorToolNames("museum_goal");
 
   expect(tools.slice(0, 3)).toEqual(["skyagent_start", "skyagent_objective_list", "skyagent_server_status"]);
+  expect(tools).toContain("skyblock_museum_donation_plan");
   expect(tools).toContain("skyblock_profile_section:museum");
-  expect(tools).toContain("skyblock_inventory");
   expect(tools).toContain("skyblock_price");
   expect(tools).not.toContain("skyblock_progression");
 
-  const museum = skyAgentBehaviorRoute("museum_goal").steps.find((step) => step.id === "museum");
-  expect(museum?.fallback).toEqual([
+  const museumPlan = skyAgentBehaviorRoute("museum_goal").steps.find((step) => step.id === "museum_plan");
+  expect(museumPlan?.fallback).toEqual([
+    "skyblock_profile_section:museum",
     "skyblock_museum",
     "hypixel_request:skyblock/museum",
-    "bounded skyblock_profile_member extraction",
   ]);
 });
 

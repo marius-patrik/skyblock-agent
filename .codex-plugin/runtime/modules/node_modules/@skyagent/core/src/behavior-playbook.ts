@@ -136,20 +136,20 @@ export function skyAgentBehaviorRoute(intent: SkyAgentBehaviorIntent): SkyAgentB
     case "museum_goal":
       return route("museum_goal", "Plan concrete museum progress from owned/donatable state rather than generic progression.", [
         {
-          id: "museum",
-          tool: "skyblock_profile_section:museum",
-          reason: "Read museum progress and donation state before recommending items.",
+          id: "museum_plan",
+          tool: "skyblock_museum_donation_plan",
+          reason: "Rank already-donated, owned, hidden-owned, missing, buy, source, and snipe donation candidates before generic progression advice.",
           required: true,
           compact: true,
-          fallback: ["skyblock_museum", "hypixel_request:skyblock/museum", "bounded skyblock_profile_member extraction"],
+          fallback: ["skyblock_profile_section:museum", "skyblock_museum", "hypixel_request:skyblock/museum"],
         },
         {
-          id: "hidden_items",
-          tool: "skyblock_inventory",
-          reason: "Inspect inventory, ender chest, backpacks, personal vault, wardrobe, pets, and accessory bag for hidden donor candidates.",
+          id: "museum_evidence",
+          tool: "skyblock_profile_section:museum",
+          reason: "Read compact Museum value/progress evidence when the donation planner reports missing or uncertain fields.",
           required: true,
           compact: true,
-          fallback: ["skyblock_normalized_items", "skyblock_item_dump with debug only for the missing section"],
+          fallback: ["skyblock_inventory", "skyblock_normalized_items", "skyblock_item_dump with debug only for the missing section"],
         },
         {
           id: "prices",

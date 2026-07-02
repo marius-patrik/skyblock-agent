@@ -143,6 +143,24 @@ describe("inventory extraction", () => {
     expect(section.warnings).toEqual([]);
   });
 
+  test("extracts personal vault contents", async () => {
+    const section = await inventorySectionFromMember({
+      inventory: {
+        personal_vault_contents: { data: payload([item(4, "minecraft:gold_sword", "MIDAS_SWORD", 1, "Midas' Sword")]) },
+      },
+    }, "personal_vault");
+
+    expect(section.available).toBe(true);
+    expect(section.sourcePath).toBe("inventory.personal_vault_contents");
+    expect(section.itemCount).toBe(1);
+    expect(section.items[0]).toMatchObject({
+      internalId: "MIDAS_SWORD",
+      displayName: "Midas' Sword",
+      sourcePath: "inventory.personal_vault_contents",
+      slot: 4,
+    });
+  });
+
   test("extracts current accessory bag from the inventory bag map talisman payload", async () => {
     const section = await inventorySectionFromMember({
       inventory: {

@@ -19,7 +19,7 @@ Use this skill when the user asks where their profile stands, wants SkyCrypt-sty
 - Use `$skyagent-context-engine` for broad progression questions; prefer `skyagent_start` when no startup payload is present so cached profile context, objective summaries, server status, recent events, provider freshness, and follow-up tools are loaded first.
 - Use `$skyagent-live-progress` when recent skill gains, Slayer kills, dungeon runs, Garden changes, profile refreshes, or explicit progress events may affect section status.
 - Use `$skyagent-objectives` when progression gaps should become todos, source-item tasks, or tracked objective progress.
-- For Museum goals, use the `museum` section before generic progression. If the summary is missing, fall back to `skyblock_museum`, `skyblock_profile_member`, or `hypixel_request` for bounded museum-field extraction.
+- For Museum donation goals, route to `$skyagent-planning` and `skyblock_museum_donation_plan` before generic progression. Use the `museum` section for compact progress/value evidence, and fall back to `skyblock_museum`, `skyblock_profile_member`, or `hypixel_request` only for missing planner fields.
 
 ## Rules
 
