@@ -4,14 +4,28 @@ import { publicConfig } from "@skyagent/core";
 import { SURFACE_CONTRACTS, trackedTuiContractGaps } from "@skyagent/core/surface-contracts";
 import { gatewayClient } from "@skyagent/gateway/manager";
 
-type MenuId = "agent" | "status" | "profiles" | "overview" | "debug" | "advanced";
+export type MenuId =
+  | "agent"
+  | "status"
+  | "profiles"
+  | "overview"
+  | "inventory"
+  | "gear"
+  | "accessories"
+  | "networth"
+  | "progression"
+  | "providers"
+  | "events"
+  | "objectives"
+  | "debug";
 
-type TuiState = {
+export type TuiState = {
   menuIndex: number;
   profileCursor: number;
   debugCursor: number;
   loading: boolean;
   error: string | null;
+  errorScreen: MenuId | null;
   gateway: Awaited<ReturnType<typeof gatewayClient>> | null;
   config: any | null;
   agent: any | null;
@@ -21,6 +35,7 @@ type TuiState = {
   activity: string | null;
   profiles: any[];
   overview: any | null;
+  screenData: Partial<Record<MenuId, any>>;
   debugResult: unknown;
 };
 
@@ -31,18 +46,20 @@ const MENU: Array<{ id: MenuId; label: string }> = [
   { id: "status", label: "Config / status" },
   { id: "profiles", label: "Profile selector" },
   { id: "overview", label: "Profile overview" },
+  { id: "inventory", label: "Inventory / sections" },
+  { id: "gear", label: "Pets / wardrobe / gear" },
+  { id: "accessories", label: "Accessories / MP" },
+  { id: "networth", label: "Networth" },
+  { id: "progression", label: "Progression / readiness" },
+  { id: "providers", label: "Providers / server" },
+  { id: "events", label: "Context events" },
+  { id: "objectives", label: "Objectives" },
   { id: "debug", label: "Raw API / debug launcher" },
-  { id: "advanced", label: "Advanced sections" },
 ];
 
-const PENDING_SECTIONS = [
-  ["Inventory", "available through CLI/MCP; richer TUI screen pending"],
-  ["Networth", "available through CLI/MCP; richer TUI screen pending"],
-  ["Accessories", "available through CLI/MCP; richer TUI screen pending"],
-  ["Progression", "available through CLI/MCP; richer TUI screen pending"],
-  ["Readiness", "available through CLI/MCP; richer TUI screen pending"],
-  ["Planner", "available through CLI/MCP; richer TUI screen pending"],
-];
+export const TUI_MENU_IDS = MENU.map((item) => item.id);
+export const TUI_SURFACE_SCREEN_IDS: MenuId[] = ["inventory", "gear", "accessories", "networth", "progression", "providers", "events", "objectives"];
+export const TUI_PROFILE_BOUND_SCREEN_IDS: MenuId[] = ["inventory", "gear", "accessories", "networth", "progression"];
 
 const DEBUG_ACTIONS = [
   { label: "Gateway version", endpoint: "version" },
@@ -59,6 +76,147 @@ function formatCoins(value: unknown) {
   return typeof value === "number" ? Math.round(value).toLocaleString("en-US") : "unknown";
 }
 
+function listCount(value: unknown) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function firstArray(...values: unknown[]) {
+  return values.find((value) => Array.isArray(value)) as any[] | undefined;
+}
+
+export function compactJson(value: unknown) {
+  return JSON.stringify(value, (key, nested) => {
+    if (/api[-_]?key|token|authorization|secret|password/i.test(key)) return "[redacted]";
+    if (typeof nested === "string" && nested.length > 240) return `${nested.slice(0, 240)}...`;
+    return nested;
+  }, 2);
+}
+
+function sectionStateLabel(value: any) {
+  if (!value) return "missing";
+  if (value.available === false || value.status === "missing") return "missing";
+  if (value.warning || value.warnings?.length) return "degraded";
+  return "available";
+}
+
+export function tuiInventorySummary(data: any) {
+  const inventory = data?.inventory?.inventory ?? data?.inventory ?? {};
+  const sections = inventory?.sections ?? inventory;
+  const normalized = data?.normalized?.items ?? data?.normalizedItems?.items ?? data?.normalizedItems ?? [];
+  const names = Object.keys(sections).filter((name) => name !== "ok").slice(0, 10);
+  return { sections, normalized, names };
+}
+
+export function tuiGearSummary(data: any) {
+  const inventory = data?.inventory?.inventory ?? data?.inventory ?? {};
+  const normalized = data?.normalized?.items ?? data?.normalizedItems?.items ?? data?.normalizedItems ?? [];
+  const items = Array.isArray(normalized) ? normalized : [];
+  const pets = firstArray(inventory?.pets, inventory?.sections?.pets?.items, items.filter((item: any) => item?.kind === "pet")) ?? [];
+  const wardrobe = firstArray(inventory?.wardrobe, inventory?.sections?.wardrobe?.items, items.filter((item: any) => item?.section === "wardrobe")) ?? [];
+  const armor = firstArray(inventory?.armor, inventory?.sections?.armor?.items, items.filter((item: any) => item?.section === "armor")) ?? [];
+  const equipment = firstArray(inventory?.equipment, inventory?.sections?.equipment?.items, items.filter((item: any) => item?.section === "equipment")) ?? [];
+  const current = [...armor, ...equipment];
+  return { pets, wardrobe, current };
+}
+
+export function tuiAccessoriesSummary(data: any) {
+  const accessories = data?.accessories?.accessories ?? data?.accessories ?? {};
+  const missing = data?.missing?.missingAccessories ?? data?.missing ?? {};
+  return {
+    magicalPower: accessories?.magicalPower ?? accessories?.mp ?? "unknown",
+    owned: accessories?.accessories ?? accessories?.items ?? [],
+    missing: missing?.missingAccessories ?? missing?.missing ?? [],
+    warnings: accessories?.warnings ?? missing?.warnings ?? [],
+  };
+}
+
+export function tuiNetworthSummary(data: any) {
+  const networth = data?.networth?.networth ?? data?.networth ?? {};
+  return {
+    networth,
+    sections: networth?.sections ?? {},
+    total: networth?.total ?? networth?.totalValue,
+    purse: networth?.currency?.purse ?? networth?.purse,
+    bank: networth?.currency?.bank ?? networth?.bank,
+    warnings: networth?.warnings ?? [],
+  };
+}
+
+export function tuiProgressionSummary(data: any) {
+  const progression = data?.progression?.progression ?? data?.progression ?? {};
+  const readiness = data?.readiness?.readiness ?? data?.readiness ?? {};
+  const weight = data?.weight?.weight ?? data?.weight ?? {};
+  return {
+    progression,
+    readiness,
+    weight,
+    sections: progression?.sections ?? progression,
+    warnings: readiness?.warnings ?? progression?.warnings ?? [],
+  };
+}
+
+export function tuiProvidersSummary(data: any) {
+  const providerPayload = data?.providerStatus ?? {};
+  const rawProviderStatus = providerPayload?.providerStatus
+    ?? (Array.isArray(providerPayload?.providers) ? providerPayload : providerPayload?.providers)
+    ?? providerPayload;
+  const providerStatus = Array.isArray(rawProviderStatus) ? { providers: rawProviderStatus } : rawProviderStatus;
+  const server = data?.serverStatus?.serverStatus ?? data?.serverStatus ?? {};
+  const llm = data?.llm?.provider ?? data?.llm ?? {};
+  const providers = providerStatus?.providers ?? [];
+  const resources = providerStatus?.resources ?? [];
+  return {
+    providers,
+    resources,
+    server,
+    llm,
+    warnings: [
+      ...(providerStatus?.warnings ?? []),
+      ...providers.flatMap((provider: any) => provider?.warnings ?? []),
+      ...resources.flatMap((resource: any) => resource?.warnings ?? []),
+    ],
+  };
+}
+
+export function tuiProviderFreshnessLabel(entry: any) {
+  if (!entry) return "unknown";
+  if (entry.status === "offline" || entry.status === "unavailable") return "offline";
+  if (entry.status === "missing_api_key" || entry.status === "degraded") return "degraded";
+  if (entry.freshness?.status) return entry.freshness.status;
+  if (entry.cacheStatus) return entry.cacheStatus;
+  if (entry.cache?.staleCount > 0) return "stale";
+  if (entry.cache?.unavailableCount > 0) return "degraded";
+  if (entry.cache?.entryCount > 0 || entry.status === "available") return "fresh";
+  return "unknown";
+}
+
+export function tuiGatewayStateLabel(gateway: any, providerSummary: ReturnType<typeof tuiProvidersSummary>) {
+  if (!gateway?.status?.running) return "offline";
+  if (providerSummary.providers.some((provider: any) => ["missing_api_key", "degraded", "offline", "unavailable"].includes(provider?.status))) {
+    return "degraded";
+  }
+  const freshness = [...providerSummary.providers, ...providerSummary.resources].map((entry: any) => tuiProviderFreshnessLabel(entry));
+  if (freshness.includes("stale")) return "stale";
+  if (providerSummary.warnings.length) return "degraded";
+  return "connected";
+}
+
+export function tuiEventsSummary(data: any) {
+  const batch = data?.events ?? data ?? {};
+  return {
+    latestSequence: batch?.latestSequence,
+    events: batch?.events ?? [],
+  };
+}
+
+export function tuiObjectivesSummary(data: any, agent: any = null) {
+  const objectives = data?.objectives;
+  const items = Array.isArray(objectives)
+    ? objectives
+    : objectives?.objectives ?? objectives?.active ?? activeObjectiveItems(agent);
+  return { objectives: items ?? [] };
+}
+
 function profileLabel(profile: any) {
   const name = profile.cuteName ?? "unnamed";
   const selected = profile.selected ? " selected" : "";
@@ -72,6 +230,7 @@ function createState(): TuiState {
     debugCursor: 0,
     loading: false,
     error: null,
+    errorScreen: null,
     gateway: null,
     config: null,
     agent: null,
@@ -81,22 +240,155 @@ function createState(): TuiState {
     activity: null,
     profiles: [],
     overview: null,
+    screenData: {},
     debugResult: null,
   };
 }
 
-function setupGuidance(config: any, needsProfile = false) {
+function setupGuidance(config: any, options: boolean | { needsProfile?: boolean; needsApiKey?: boolean } = false) {
+  const needsProfile = typeof options === "boolean" ? options : Boolean(options.needsProfile);
+  const needsApiKey = typeof options === "boolean" ? true : options.needsApiKey !== false;
   const missing = [];
   if (!config?.username && !config?.uuid) {
     missing.push("username or UUID");
   }
-  if (!config?.apiKeyConfigured) {
+  if (needsApiKey && !config?.apiKeyConfigured) {
     missing.push("Hypixel API key");
   }
   if (needsProfile && !config?.selectedProfileId) {
     missing.push("selected profile");
   }
   return missing.length ? `Setup incomplete: configure ${missing.join(", ")} from the status screen or CLI, then refresh.` : null;
+}
+
+export function tuiSetupCommand(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) return { ok: false as const, error: "Type setup value, for example: username PlayerName" };
+  const [rawField, ...valueParts] = trimmed.split(/\s+/);
+  const value = valueParts.join(" ").trim();
+  const fieldMap: Record<string, "username" | "uuid" | "apiKey" | "selectedProfileId"> = {
+    name: "username",
+    username: "username",
+    uuid: "uuid",
+    key: "apiKey",
+    apikey: "apiKey",
+    "api-key": "apiKey",
+    profile: "selectedProfileId",
+    "profile-id": "selectedProfileId",
+    selectedProfileId: "selectedProfileId",
+  };
+  const field = fieldMap[rawField];
+  if (!field) return { ok: false as const, error: "Unknown setup field. Use username, uuid, api-key, or profile." };
+  if (!value) return { ok: false as const, error: `Missing value for ${rawField}.` };
+  return { ok: true as const, field, config: { [field]: value } };
+}
+
+export function tuiSetupDisplayInput(input: string) {
+  const trimmedStart = input.trimStart();
+  const match = /^(api-key|apikey|key)(\s+)(.*)$/i.exec(trimmedStart);
+  if (!match) return input;
+  const prefixLength = input.length - trimmedStart.length;
+  const prefix = input.slice(0, prefixLength);
+  const value = match[3] ?? "";
+  const masked = value ? "*".repeat(Math.min(Math.max(value.length, 6), 24)) : "";
+  return `${prefix}${match[1]}${match[2]}${masked}`;
+}
+
+export function tuiScreenIndex(screen: MenuId) {
+  return MENU.findIndex((item) => item.id === screen);
+}
+
+export function tuiMenuNavigationAction(input: string, key: { upArrow?: boolean; downArrow?: boolean; leftArrow?: boolean; rightArrow?: boolean }, currentIndex: number) {
+  if (key.upArrow || input === "k") {
+    return (currentIndex - 1 + MENU.length) % MENU.length;
+  }
+  if (key.downArrow || input === "j") {
+    return (currentIndex + 1) % MENU.length;
+  }
+  return currentIndex;
+}
+
+export function tuiMenuStateNavigationAction(input: string, key: { upArrow?: boolean; downArrow?: boolean }, state: Pick<TuiState, "menuIndex" | "error" | "errorScreen">) {
+  const menuIndex = tuiMenuNavigationAction(input, key, state.menuIndex);
+  return menuIndex === state.menuIndex ? state : { ...state, menuIndex, error: null, errorScreen: null };
+}
+
+export function tuiListCursorAction(screen: MenuId, input: string, key: { leftArrow?: boolean; rightArrow?: boolean }, currentIndex: number, itemCount: number) {
+  if (!["profiles", "debug"].includes(screen) || itemCount <= 0) {
+    return currentIndex;
+  }
+  if (key.leftArrow || input === "h") {
+    return (currentIndex - 1 + itemCount) % itemCount;
+  }
+  if (key.rightArrow || input === "l") {
+    return (currentIndex + 1) % itemCount;
+  }
+  return currentIndex;
+}
+
+export function shouldAutoLoadTuiSurfaceScreen(screen: MenuId, state: Pick<TuiState, "loading" | "error" | "errorScreen" | "screenData">) {
+  const activeError = state.error && (!state.errorScreen || state.errorScreen === screen);
+  return TUI_SURFACE_SCREEN_IDS.includes(screen) && !state.loading && !activeError && !state.screenData[screen];
+}
+
+export function clearProfileBoundScreenData(screenData: Partial<Record<MenuId, any>>) {
+  const next = { ...screenData };
+  for (const screen of TUI_PROFILE_BOUND_SCREEN_IDS) {
+    delete next[screen];
+  }
+  return next;
+}
+
+export async function loadTuiSurfaceScreen(client: any, config: any, screen: MenuId) {
+  const needsProfile = ["inventory", "gear", "accessories", "networth", "progression"].includes(screen);
+  const guidance = needsProfile ? setupGuidance(config, { needsProfile: true, needsApiKey: false }) : null;
+  if (guidance) {
+    return { data: null, error: guidance };
+  }
+
+  let data: any;
+  if (screen === "inventory" || screen === "gear") {
+    const [inventory, normalized] = await Promise.all([
+      client.inventory(),
+      client.normalizedItems(),
+    ]);
+    data = { inventory, normalized };
+  } else if (screen === "accessories") {
+    const [accessories, missing] = await Promise.all([
+      client.accessories(undefined, undefined, { maxPriceLookups: 40, timeoutMs: 3_000 }),
+      client.missingAccessories(undefined, undefined, { maxPriceLookups: 40, timeoutMs: 3_000 }),
+    ]);
+    data = { accessories, missing };
+  } else if (screen === "networth") {
+    data = await client.networth(undefined, undefined, { maxItems: 80, timeoutMs: 4_000, includeItems: false });
+  } else if (screen === "progression") {
+    const [progression, weight, readiness] = await Promise.all([
+      client.progression(),
+      client.weight(),
+      client.readiness("general", undefined, undefined, {
+        maxItems: 60,
+        networthTimeoutMs: 3_000,
+        maxPriceLookups: 30,
+        accessoryTimeoutMs: 3_000,
+      }),
+    ]);
+    data = { progression, weight, readiness };
+  } else if (screen === "providers") {
+    const [providerStatus, serverStatus, llm] = await Promise.all([
+      client.providerStatus(),
+      client.serverStatus(),
+      client.llmProviderStatus(),
+    ]);
+    data = { providerStatus, serverStatus, llm };
+  } else if (screen === "events") {
+    data = await client.contextEvents({ limit: 20 });
+  } else if (screen === "objectives") {
+    data = await client.agentObjectives();
+  } else {
+    throw new Error(`Unsupported TUI surface screen: ${screen}`);
+  }
+
+  return { data, error: null };
 }
 
 export function tuiStatus() {
@@ -134,6 +426,20 @@ export function tuiStatus() {
 
 export function tuiSnapshot() {
   const status = tuiStatus();
+  const representativeContentStates = {
+    status: ["connected", "offline", "setup_guidance", "redacted_config"],
+    profiles: ["loading", "empty", "selectable_profiles", "setup_guidance"],
+    overview: ["loading", "empty", "loaded_summary", "stale_or_missing_api_warning"],
+    inventory: ["section_summary", "normalized_item_count", "debug_raw_action"],
+    gear: ["current_gear", "wardrobe", "pets", "missing_inventory_state"],
+    accessories: ["magical_power", "owned_count", "missing_candidates", "price_freshness_warnings"],
+    networth: ["compact_totals", "section_totals", "bounded_price_warnings"],
+    progression: ["skill_sections", "weight_estimate", "readiness_summary", "missing_data_warnings"],
+    providers: ["gateway_connection", "server_status", "provider_freshness", "llm_config_state"],
+    events: ["latest_sequence", "recent_events", "empty_stream"],
+    objectives: ["open_items", "empty_state", "actionable_status"],
+    debug: ["explicit_raw_action", "redacted_result"],
+  };
   return {
     ...status,
     screens: MENU.map((item) => item.id),
@@ -144,6 +450,7 @@ export function tuiSnapshot() {
       issue: contract.tui.issue ?? null,
     })),
     trackedContractGaps: trackedTuiContractGaps(),
+    representativeContentStates,
     shortcuts: ["up/down or j/k", "left/right or h/l", "enter", "r", "q", "agent text input", "tab add objective", "[/] select objective", "x complete objective"],
     secrets: "api keys are never printed",
   };
@@ -210,6 +517,13 @@ export function agentShouldAppendPrintableInput(input: string, currentInput: str
       && !key.delete
       && !key.tab
   );
+}
+
+export function statusShouldAppendSetupInput(input: string, currentInput: string, key: AgentInputKeyState = {}) {
+  if (!currentInput && (input === "q" || input === "j" || input === "k")) {
+    return false;
+  }
+  return agentShouldAppendPrintableInput(input, currentInput, key);
 }
 
 export function agentInputAction(input: string, currentInput: string) {
@@ -340,6 +654,11 @@ function StatusScreen({ state }: { state: TuiState }) {
         <Text>Item metadata: {status.providers.itemMetadata}</Text>
         <Text>Price cache: {status.providers.priceCache}</Text>
       </Box>
+      <Box marginTop={1}>
+        <Text color="green">{"> "}</Text>
+        <Text>{tuiSetupDisplayInput(state.input)}</Text>
+        <Text dimColor>{state.input ? "" : "username <name> | uuid <uuid> | api-key <key> | profile <id>"}</Text>
+      </Box>
     </Box>
   );
 }
@@ -426,28 +745,188 @@ function DebugScreen({ state }: { state: TuiState }) {
       {state.debugResult && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Last result</Text>
-          <Text>{JSON.stringify(state.debugResult, null, 2)}</Text>
+          <Text>{compactJson(state.debugResult)}</Text>
         </Box>
       )}
     </Box>
   );
 }
 
-function AdvancedScreen({ state }: { state: TuiState }) {
-  const gateway = state.gateway?.status;
-  const config = state.config;
+function ScreenFrame({ state, title, empty, isEmpty, children }: { state: TuiState; title: string; empty: string; isEmpty: boolean; children: React.ReactNode }) {
+  const active = MENU[state.menuIndex].id;
+  const screenError = state.error && (!state.errorScreen || state.errorScreen === active) ? state.error : null;
   return (
     <Box flexDirection="column">
-      <Header title="Advanced sections" />
-      {state.loading && <Text color="yellow">Refreshing gateway contract...</Text>}
-      {state.error && <Text color="red">Error: {state.error}</Text>}
-      <Text>Gateway: {gateway ? `${gateway.url} pid=${gateway.pid}` : "not connected"}</Text>
-      <Text>Configured player: {config?.username ?? config?.uuid ?? "not configured"}</Text>
-      <Text>Selected profile: {config?.selectedProfileId ?? "not configured"}</Text>
-      {PENDING_SECTIONS.map(([name, note]) => (
-        <Text key={name}>- {name}: {note}</Text>
-      ))}
+      <Header title={title} />
+      {state.loading && <Text color="yellow">{state.activity ?? "Loading..."}</Text>}
+      {screenError && <Text color="red">Error: {screenError}</Text>}
+      {!state.loading && !screenError && !isEmpty && children}
+      {!state.loading && !screenError && isEmpty && <Text dimColor>{empty}</Text>}
     </Box>
+  );
+}
+
+function InventoryScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.inventory;
+  const { sections, normalized, names } = tuiInventorySummary(data);
+  return (
+    <ScreenFrame state={state} title="Inventory / sections" empty="No inventory loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Sections: {names.length ? names.join(", ") : "none"}</Text>
+          <Text>Normalized items: {listCount(normalized)}</Text>
+          {names.map((name) => (
+            <Text key={name}>- {name}: {sectionStateLabel(sections[name])}</Text>
+          ))}
+          <Text dimColor>Raw payloads are only shown from Raw API / debug launcher.</Text>
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function GearScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.gear;
+  const { pets, wardrobe, current } = tuiGearSummary(data);
+  return (
+    <ScreenFrame state={state} title="Pets / wardrobe / gear" empty="No gear data loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Current gear pieces: {listCount(current)}</Text>
+          <Text>Wardrobe items: {listCount(wardrobe)}</Text>
+          <Text>Pets: {listCount(pets)}</Text>
+          {current.slice(0, 6).map((item: any, index: number) => (
+            <Text key={`${item?.id ?? item?.name ?? "gear"}-${index}`}>- {item?.name ?? item?.id ?? "gear item"}</Text>
+          ))}
+          {!current.length && <Text dimColor>No current armor/equipment items were available from the profile data.</Text>}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function AccessoriesScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.accessories;
+  const summary = tuiAccessoriesSummary(data);
+  return (
+    <ScreenFrame state={state} title="Accessories / magical power" empty="No accessory data loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Magical Power: {summary.magicalPower}</Text>
+          <Text>Owned accessories: {listCount(summary.owned)}</Text>
+          <Text>Missing candidates: {listCount(summary.missing)}</Text>
+          {summary.warnings.slice(0, 5).map((warning: any, index: number) => (
+            <Text key={index} color="yellow">! {warning.message ?? warning.code ?? String(warning)}</Text>
+          ))}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function NetworthScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.networth;
+  const summary = tuiNetworthSummary(data);
+  return (
+    <ScreenFrame state={state} title="Networth" empty="No networth loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Total: {formatCoins(summary.total)}</Text>
+          <Text>Purse: {formatCoins(summary.purse)}</Text>
+          <Text>Bank: {formatCoins(summary.bank)}</Text>
+          {Object.entries(summary.sections).slice(0, 8).map(([name, section]: [string, any]) => (
+            <Text key={name}>- {name}: {formatCoins(section?.total ?? section?.value)}</Text>
+          ))}
+          {summary.warnings.slice(0, 5).map((warning: any, index: number) => (
+            <Text key={index} color="yellow">! {warning.message ?? warning.code ?? String(warning)}</Text>
+          ))}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function ProgressionScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.progression;
+  const summary = tuiProgressionSummary(data);
+  return (
+    <ScreenFrame state={state} title="Progression / readiness" empty="No progression loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Weight estimate: {summary.weight?.estimate ?? summary.weight?.total ?? "unknown"}</Text>
+          <Text>Readiness: {summary.readiness?.status ?? summary.readiness?.overall ?? summary.readiness?.score ?? "unknown"}</Text>
+          {Object.entries(summary.sections).slice(0, 8).map(([name, section]: [string, any]) => (
+            <Text key={name}>- {name}: {section?.level ?? section?.xp ?? sectionStateLabel(section)}</Text>
+          ))}
+          {summary.warnings.slice(0, 5).map((warning: any, index: number) => (
+            <Text key={index} color="yellow">! {warning.message ?? warning.code ?? String(warning)}</Text>
+          ))}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function ProvidersScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.providers;
+  const summary = tuiProvidersSummary(data);
+  return (
+    <ScreenFrame state={state} title="Providers / server" empty="No provider status loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Gateway: {state.gateway?.status?.url ?? "not connected"}</Text>
+          <Text>Gateway state: {tuiGatewayStateLabel(state.gateway, summary)}</Text>
+          <Text>Server online: {summary.server?.online === null || summary.server?.online === undefined ? "unknown" : boolLabel(summary.server.online)}</Text>
+          <Text>LiteLLM: {summary.llm?.configured ? `${summary.llm.provider}:${summary.llm.model}` : "not configured"}</Text>
+          {summary.providers.slice(0, 6).map((provider: any) => (
+            <Text key={provider.id ?? provider.source}>- {provider.id ?? provider.source}: {provider.status ?? "unknown"} [{tuiProviderFreshnessLabel(provider)}]</Text>
+          ))}
+          <Text>Public resources: {listCount(summary.resources)}</Text>
+          {summary.resources.slice(0, 6).map((resource: any) => (
+            <Text key={resource.kind ?? resource.endpoint}>- {resource.kind ?? resource.endpoint}: {tuiProviderFreshnessLabel(resource)}</Text>
+          ))}
+          {summary.warnings.slice(0, 5).map((warning: any, index: number) => (
+            <Text key={index} color="yellow">! {warning.message ?? warning.code ?? String(warning)}</Text>
+          ))}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function EventsScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.events;
+  const summary = tuiEventsSummary(data);
+  return (
+    <ScreenFrame state={state} title="Context events" empty="No context events loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Latest sequence: {summary.latestSequence ?? "unknown"}</Text>
+          {summary.events.slice(0, 8).map((event: any) => (
+            <Text key={event.id ?? event.sequence}>- #{event.sequence ?? "?"} {event.type ?? "event"} from {event.source?.kind ?? "unknown"}</Text>
+          ))}
+          {!summary.events.length && <Text dimColor>No recent events.</Text>}
+        </Box>
+      )}
+    </ScreenFrame>
+  );
+}
+
+function ObjectivesScreen({ state }: { state: TuiState }) {
+  const data = state.screenData.objectives;
+  const summary = tuiObjectivesSummary(data, state.agent);
+  return (
+    <ScreenFrame state={state} title="Objectives" empty="No objectives loaded. Press r to refresh." isEmpty={!data}>
+      {data && (
+        <Box flexDirection="column">
+          <Text>Open work items: {listCount(summary.objectives)}</Text>
+          {summary.objectives.slice(0, 10).map((objective: any, index: number) => (
+            <Text key={objective.id ?? index}>- {objective.itemKind ?? "objective"}: {objective.title ?? objective.id} [{objective.status ?? "open"}]</Text>
+          ))}
+          {!summary.objectives.length && <Text dimColor>No active objectives.</Text>}
+        </Box>
+      )}
+    </ScreenFrame>
   );
 }
 
@@ -468,7 +947,25 @@ function ActiveScreen({ state }: { state: TuiState }) {
   if (active === "debug") {
     return <DebugScreen state={state} />;
   }
-  return <AdvancedScreen state={state} />;
+  if (active === "inventory") return <InventoryScreen state={state} />;
+  if (active === "gear") return <GearScreen state={state} />;
+  if (active === "accessories") return <AccessoriesScreen state={state} />;
+  if (active === "networth") return <NetworthScreen state={state} />;
+  if (active === "progression") return <ProgressionScreen state={state} />;
+  if (active === "providers") return <ProvidersScreen state={state} />;
+  if (active === "events") return <EventsScreen state={state} />;
+  return <ObjectivesScreen state={state} />;
+}
+
+export function TuiScreenPreview({ screen, state = {} }: { screen: MenuId; state?: Partial<TuiState> }) {
+  const base = createState();
+  const merged = {
+    ...base,
+    ...state,
+    menuIndex: tuiScreenIndex(screen),
+    screenData: { ...base.screenData, ...state.screenData },
+  };
+  return <ActiveScreen state={merged} />;
 }
 
 export async function connectTuiGateway() {
@@ -488,7 +985,7 @@ export function SkyAgentTuiApp() {
 
   const connectGateway = useCallback(async () => {
     const session = await connectTuiGateway();
-    patchState({ gateway: session.gateway, config: session.config, agent: session.agent, error: null });
+    patchState({ gateway: session.gateway, config: session.config, agent: session.agent, error: null, errorScreen: null });
     return session;
   }, [patchState]);
 
@@ -498,6 +995,7 @@ export function SkyAgentTuiApp() {
     patchState({
       loading: true,
       error: null,
+      errorScreen: null,
       input: "",
       activity: "Streaming agent response...",
       transcript: startAgentTranscript(state.transcript, message),
@@ -521,14 +1019,14 @@ export function SkyAgentTuiApp() {
           patchState({ agent: event.session });
         }
         if (event.type === "error") {
-          patchState({ error: event.error });
+          patchState({ error: event.error, errorScreen: "agent" });
         }
       });
       setState((current) => {
         return { ...current, transcript: finishAgentTranscript(current.transcript, assistant), loading: false, activity: null };
       });
     } catch (error) {
-      patchState({ error: error instanceof Error ? error.message : String(error), loading: false, activity: null });
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "agent", loading: false, activity: null });
     }
   }, [connectGateway, patchState, state.gateway, state.input, state.transcript]);
 
@@ -537,14 +1035,14 @@ export function SkyAgentTuiApp() {
     const selected = objectives.length ? objectives[Math.min(state.objectiveCursor, objectives.length - 1)] : null;
     const title = state.input.trim();
     if (action === "create" && !title) {
-      patchState({ error: "Type an objective title before pressing tab." });
+      patchState({ error: "Type an objective title before pressing tab.", errorScreen: "agent" });
       return;
     }
     if (action === "complete" && !selected?.id) {
-      patchState({ error: "No active objective selected." });
+      patchState({ error: "No active objective selected.", errorScreen: "agent" });
       return;
     }
-    patchState({ loading: true, error: null, activity: action === "create" ? "Creating objective..." : "Completing objective..." });
+    patchState({ loading: true, error: null, errorScreen: null, activity: action === "create" ? "Creating objective..." : "Completing objective..." });
     try {
       const { gateway } = state.gateway
         ? { gateway: state.gateway }
@@ -563,19 +1061,19 @@ export function SkyAgentTuiApp() {
         activity: null,
       });
     } catch (error) {
-      patchState({ error: error instanceof Error ? error.message : String(error), loading: false, activity: null });
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "agent", loading: false, activity: null });
     }
   }, [connectGateway, patchState, state.agent, state.gateway, state.input, state.objectiveCursor]);
 
   const loadProfiles = useCallback(async () => {
-    patchState({ loading: true, error: null });
+    patchState({ loading: true, error: null, errorScreen: null });
     try {
       const { gateway, config } = state.gateway && state.config
         ? { gateway: state.gateway, config: state.config }
         : await connectGateway();
       const guidance = setupGuidance(config);
       if (guidance) {
-        patchState({ error: guidance, loading: false });
+        patchState({ error: guidance, errorScreen: "profiles", loading: false });
         return;
       }
       const response = await gateway.client.profiles();
@@ -583,31 +1081,31 @@ export function SkyAgentTuiApp() {
       const selectedIndex = profiles.findIndex((profile) => profile.profileId === config.selectedProfileId || profile.selected);
       patchState({ profiles, profileCursor: Math.max(0, selectedIndex), loading: false });
     } catch (error) {
-      patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "profiles", loading: false });
     }
   }, [connectGateway, patchState, state.config, state.gateway]);
 
   const loadOverview = useCallback(async () => {
-    patchState({ loading: true, error: null });
+    patchState({ loading: true, error: null, errorScreen: null });
     try {
       const { gateway, config } = state.gateway && state.config
         ? { gateway: state.gateway, config: state.config }
         : await connectGateway();
-      const guidance = setupGuidance(config, true);
+      const guidance = setupGuidance(config, { needsProfile: true, needsApiKey: false });
       if (guidance) {
-        patchState({ error: guidance, loading: false });
+        patchState({ error: guidance, errorScreen: "overview", loading: false });
         return;
       }
       const response = await gateway.client.overview();
       patchState({ overview: response.overview, loading: false });
     } catch (error) {
-      patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "overview", loading: false });
     }
   }, [connectGateway, patchState, state.config, state.gateway]);
 
   const runDebugAction = useCallback(async () => {
     const action = DEBUG_ACTIONS[state.debugCursor];
-    patchState({ loading: true, error: null, debugResult: null });
+    patchState({ loading: true, error: null, errorScreen: null, debugResult: null });
     try {
       const { gateway, config } = state.gateway && state.config
         ? { gateway: state.gateway, config: state.config }
@@ -615,10 +1113,10 @@ export function SkyAgentTuiApp() {
       const guidance = action.endpoint === "profiles"
         ? setupGuidance(config)
         : action.endpoint === "overview"
-          ? setupGuidance(config, true)
+          ? setupGuidance(config, { needsProfile: true, needsApiKey: false })
           : null;
       if (guidance) {
-        patchState({ error: guidance, loading: false });
+        patchState({ error: guidance, errorScreen: "debug", loading: false });
         return;
       }
       const response = action.endpoint === "version"
@@ -637,9 +1135,32 @@ export function SkyAgentTuiApp() {
         },
       });
     } catch (error) {
-      patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "debug", loading: false });
     }
   }, [connectGateway, patchState, state.config, state.debugCursor, state.gateway]);
+
+  const loadSurfaceScreen = useCallback(async (screen: MenuId) => {
+    patchState({ loading: true, error: null, errorScreen: null, activity: `Loading ${screen}...` });
+    try {
+      const { gateway, config } = state.gateway && state.config
+        ? { gateway: state.gateway, config: state.config }
+        : await connectGateway();
+      const result = await loadTuiSurfaceScreen(gateway.client, config, screen);
+      if (result.error) {
+        patchState({ error: result.error, errorScreen: screen, loading: false, activity: null });
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        screenData: { ...current.screenData, [screen]: result.data },
+        loading: false,
+        activity: null,
+      }));
+    } catch (error) {
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: screen, loading: false, activity: null });
+    }
+  }, [connectGateway, patchState, state.config, state.gateway]);
 
   const refreshActive = useCallback(async () => {
     const active = MENU[state.menuIndex].id;
@@ -648,7 +1169,7 @@ export function SkyAgentTuiApp() {
     } else if (active === "overview") {
       await loadOverview();
     } else if (active === "agent") {
-      patchState({ loading: true, error: null, activity: "Refreshing context capsule..." });
+      patchState({ loading: true, error: null, errorScreen: null, activity: "Refreshing context capsule..." });
       try {
         const { gateway } = state.gateway
           ? { gateway: state.gateway }
@@ -656,23 +1177,53 @@ export function SkyAgentTuiApp() {
         const response = await gateway.client.refreshAgentContext({ allowStale: true });
         patchState({ agent: response.agent, loading: false, activity: null });
       } catch (error) {
-        patchState({ error: error instanceof Error ? error.message : String(error), loading: false, activity: null });
+        patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "agent", loading: false, activity: null });
       }
-    } else if (active === "status" || active === "advanced") {
-      patchState({ loading: true, error: null });
+    } else if (["inventory", "gear", "accessories", "networth", "progression", "providers", "events", "objectives"].includes(active)) {
+      await loadSurfaceScreen(active);
+    } else if (active === "status") {
+      patchState({ loading: true, error: null, errorScreen: null });
       try {
         await connectGateway();
         patchState({ loading: false });
       } catch (error) {
-        patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+        patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "status", loading: false });
       }
     }
-  }, [connectGateway, loadOverview, loadProfiles, patchState, state.menuIndex]);
+  }, [connectGateway, loadOverview, loadProfiles, loadSurfaceScreen, patchState, state.menuIndex]);
+
+  const runStatusSetup = useCallback(async () => {
+    const command = tuiSetupCommand(state.input);
+    if (!command.ok) {
+      patchState({ error: command.error, errorScreen: "status" });
+      return;
+    }
+    patchState({ loading: true, error: null, errorScreen: null, activity: "Writing setup config..." });
+    try {
+      const { gateway } = state.gateway
+        ? { gateway: state.gateway }
+        : await connectGateway();
+      const response = await gateway.client.setConfig(command.config);
+      setState((current) => ({
+        ...current,
+        config: response.config,
+        overview: null,
+        profiles: command.field === "username" || command.field === "uuid" ? [] : current.profiles,
+        profileCursor: command.field === "username" || command.field === "uuid" ? 0 : current.profileCursor,
+        screenData: clearProfileBoundScreenData(current.screenData),
+        input: "",
+        loading: false,
+        activity: command.field === "apiKey" ? "API key stored." : `${command.field} stored.`,
+      }));
+    } catch (error) {
+      patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "status", loading: false, activity: null });
+    }
+  }, [connectGateway, patchState, state.gateway, state.input]);
 
   const selectActive = useCallback(async () => {
     const active = MENU[state.menuIndex].id;
     if (active === "profiles" && state.profiles[state.profileCursor]) {
-      patchState({ loading: true, error: null });
+      patchState({ loading: true, error: null, errorScreen: null });
       try {
         const { gateway } = state.gateway
           ? { gateway: state.gateway }
@@ -680,14 +1231,22 @@ export function SkyAgentTuiApp() {
         const selectedProfileId = state.profiles[state.profileCursor].profileId;
         const configResponse = await gateway.client.setConfig({ selectedProfileId });
         const overviewResponse = await gateway.client.overview();
-        patchState({
+        setState((current) => ({
+          ...current,
           config: configResponse.config,
           overview: overviewResponse.overview,
+          screenData: clearProfileBoundScreenData(current.screenData),
           loading: false,
           menuIndex: MENU.findIndex((item) => item.id === "overview"),
-        });
+        }));
       } catch (error) {
-        patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+        patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: "profiles", loading: false });
+      }
+    } else if (active === "status") {
+      if (state.input.trim()) {
+        await runStatusSetup();
+      } else {
+        await refreshActive();
       }
     } else if (active === "debug") {
       await runDebugAction();
@@ -696,7 +1255,7 @@ export function SkyAgentTuiApp() {
     } else {
       await refreshActive();
     }
-  }, [connectGateway, patchState, refreshActive, runDebugAction, sendAgentMessage, state.gateway, state.menuIndex, state.profileCursor, state.profiles]);
+  }, [connectGateway, patchState, refreshActive, runDebugAction, runStatusSetup, sendAgentMessage, state.gateway, state.input, state.menuIndex, state.profileCursor, state.profiles]);
 
   useInput((input, key) => {
     if (state.loading) {
@@ -734,6 +1293,10 @@ export function SkyAgentTuiApp() {
       setState((current) => ({ ...current, input: current.input.slice(0, -1) }));
       return;
     }
+    if (active === "status" && (key.backspace || (key as { delete?: boolean }).delete)) {
+      setState((current) => ({ ...current, input: current.input.slice(0, -1) }));
+      return;
+    }
     if (active === "agent" && agentShouldAppendPrintableInput(input, state.input, key)) {
       const result = agentInputAction(input, state.input);
       if (result.action === "quit") {
@@ -743,58 +1306,60 @@ export function SkyAgentTuiApp() {
       }
       return;
     }
+    if (active === "status" && statusShouldAppendSetupInput(input, state.input, key)) {
+      setState((current) => ({ ...current, input: `${current.input}${input}` }));
+      return;
+    }
     if (input === "q") {
       exit();
       return;
     }
+    if ((key.leftArrow || key.rightArrow || input === "h" || input === "l") && (active === "profiles" || active === "debug")) {
+      setState((current) => {
+        const listActive = MENU[current.menuIndex].id;
+        if (listActive === "profiles") {
+          return { ...current, profileCursor: tuiListCursorAction(listActive, input, key, current.profileCursor, current.profiles.length) };
+        }
+        if (listActive === "debug") {
+          return { ...current, debugCursor: tuiListCursorAction(listActive, input, key, current.debugCursor, DEBUG_ACTIONS.length) };
+        }
+        return current;
+      });
+      return;
+    }
     if (key.upArrow || input === "k") {
-      setState((current) => ({ ...current, menuIndex: (current.menuIndex - 1 + MENU.length) % MENU.length }));
+      setState((current) => ({ ...current, ...tuiMenuStateNavigationAction(input, key, current) }));
     } else if (key.downArrow || input === "j") {
-      setState((current) => ({ ...current, menuIndex: (current.menuIndex + 1) % MENU.length }));
-    } else if (key.leftArrow || input === "h") {
-      setState((current) => {
-        const active = MENU[current.menuIndex].id;
-        if (active === "profiles" && current.profiles.length) {
-          return { ...current, profileCursor: (current.profileCursor - 1 + current.profiles.length) % current.profiles.length };
-        }
-        if (active === "debug") {
-          return { ...current, debugCursor: (current.debugCursor - 1 + DEBUG_ACTIONS.length) % DEBUG_ACTIONS.length };
-        }
-        return current;
-      });
-    } else if (key.rightArrow || input === "l") {
-      setState((current) => {
-        const active = MENU[current.menuIndex].id;
-        if (active === "profiles" && current.profiles.length) {
-          return { ...current, profileCursor: (current.profileCursor + 1) % current.profiles.length };
-        }
-        if (active === "debug") {
-          return { ...current, debugCursor: (current.debugCursor + 1) % DEBUG_ACTIONS.length };
-        }
-        return current;
-      });
+      setState((current) => ({ ...current, ...tuiMenuStateNavigationAction(input, key, current) }));
     }
   });
 
   useEffect(() => {
     const active = MENU[state.menuIndex].id;
     if (active === "status") {
-      patchState({ error: null });
+      patchState({ error: null, errorScreen: null });
     }
   }, [patchState, state.menuIndex]);
 
   useEffect(() => {
+    const active = MENU[state.menuIndex].id;
+    if (shouldAutoLoadTuiSurfaceScreen(active, state)) {
+      void loadSurfaceScreen(active);
+    }
+  }, [loadSurfaceScreen, state]);
+
+  useEffect(() => {
     let cancelled = false;
     void (async () => {
-      patchState({ loading: true, error: null });
+      patchState({ loading: true, error: null, errorScreen: null });
       try {
         const session = await connectTuiGateway();
         if (!cancelled) {
-          patchState({ gateway: session.gateway, config: session.config, agent: session.agent, loading: false });
+          patchState({ gateway: session.gateway, config: session.config, agent: session.agent, error: null, errorScreen: null, loading: false });
         }
       } catch (error) {
         if (!cancelled) {
-          patchState({ error: error instanceof Error ? error.message : String(error), loading: false });
+          patchState({ error: error instanceof Error ? error.message : String(error), errorScreen: null, loading: false });
         }
       }
     })();
