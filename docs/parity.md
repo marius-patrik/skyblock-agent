@@ -65,4 +65,4 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 3. Deepen target-aware readiness with maintained meta thresholds and route-specific alternatives beyond the current gear, pet, accessory, modifier, and budget blocker checks.
 4. Deepen route-specific planner modules with maintained profit/time models, crop/contest formulas, and richer source/snipe routing.
 5. Add maintained provider adapters for exact pet level formulas, skin/dye value, Museum eligibility/value, accessory dependency chains, and modifier valuation.
-6. Keep cross-surface parity tests green so CLI, MCP, gateway, TUI, docs, and skills stay aligned. The current contract inventory lives in `packages/core/src/surface-contracts.ts`; intentional TUI gaps remain tracked by #115.
+6. Keep cross-surface parity tests green so CLI, MCP, gateway, TUI, docs, and skills stay aligned. The current contract inventory lives in `packages/core/src/surface-contracts.ts`, including the dedicated non-chat TUI screens.

@@ -276,13 +276,13 @@ The current public-readiness gap matrix lives in `docs/public-readiness-gaps.md`
 
 The Ink TUI and React web app should use the same gateway client package or shared API schema. UI state should be local to each surface, but data fetching, errors, auth headers, and result contracts should be shared.
 
-The current Ink TUI is an interim direct-core UI. It must be adapted to start or connect to the gateway before it is considered product-complete.
+The Ink TUI starts or connects to the local gateway before loading product data. Its non-chat screens use the shared gateway client rather than direct-core reads.
 
 Expected TUI behavior:
 
 - `skyagent tui` ensures the gateway is available, then renders the Ink app.
 - If setup is incomplete, TUI routes to setup state instead of failing with raw API errors.
-- Profile selector, overview, debug, advanced sections, and future screens all use gateway APIs.
+- Profile selector, overview, inventory, gear, accessories, networth, progression/readiness, providers/server status, context events, objectives, and debug screens all use gateway APIs.
 - `skyagent tui --smoke` remains deterministic JSON for CI.
 
 ## Cross-Surface Contracts
@@ -290,8 +290,7 @@ Expected TUI behavior:
 `packages/core/src/surface-contracts.ts` is the compact inventory for high-value CLI, MCP, gateway, TUI, docs, and skill parity. Tests in the CLI, MCP, gateway, and TUI packages assert that startup/context, profile overview, inventory/items, networth, accessories, progression/readiness, planning/objectives, providers, server status, and context events remain mapped across the relevant surfaces.
 
 Intentional differences:
-- The TUI currently covers startup/context, profile overview, planning/objective controls, providers, server status, and context events through the agent, status, profiles, overview, debug, and advanced screens.
-- Dedicated rich TUI screens for inventory/items, networth, accessories, and progression/readiness remain tracked by #115 rather than implemented in the parity-test slice.
+- The TUI covers startup/context, profile overview, inventory/items, gear, networth, accessories, progression/readiness, planning/objective controls, providers, server status, context events, and explicit debug actions through dedicated Ink screens.
 - Compact defaults stay the default across surfaces; raw/debug payloads and bounded valuation options must remain explicit in each contract that can return large or valuation-heavy payloads.
 
 Expected web behavior:

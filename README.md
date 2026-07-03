@@ -182,7 +182,9 @@ Launch the interactive terminal UI with:
 bun .\scripts\skyagent.ts tui
 ```
 
-The TUI opens directly into an agent chat surface backed by the same local gateway session as `skyagent start`. It also includes config/status, profile selection, profile overview, raw API/debug launcher, and advanced-section screens. It uses keyboard navigation (`up`/`down` or `j`/`k` for screens, `left`/`right` or `h`/`l` for lists, `enter`, `r`, `q`) and never prints API key values. CI can initialize the same entry point without live credentials through:
+The TUI opens into an agent chat surface backed by the same local gateway session as `skyagent start`. Non-chat screens cover config/status, profile selection, profile overview, inventory sections, pets/wardrobe/current gear, accessories and Magical Power, networth, progression/readiness, providers/server status, context events, objectives, and an explicit raw API/debug launcher. Use `r` to refresh the active screen, `enter` to select/run the active action, `up`/`down` or `j`/`k` for screens, `left`/`right` or `h`/`l` for lists, and `q` to quit.
+
+The TUI starts or attaches to the local gateway automatically. If setup is incomplete, the status/profile screens show setup guidance without printing API key values. CI can initialize the same entry point without live credentials through:
 
 ```powershell
 bun .\scripts\skyagent.ts tui --smoke
