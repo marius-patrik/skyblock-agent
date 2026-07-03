@@ -1,5 +1,5 @@
 import { inventorySectionFromMember } from "./inventory.ts";
-import { itemMetadata, metadataProviderResult, normalizeItemStacks } from "./items.ts";
+import { itemMetadata, metadataProviderResult, normalizeItemStacks, providerFreshness as itemProviderFreshness } from "./items.ts";
 import { itemPrice } from "./prices.ts";
 import { fetchProfileContext } from "./profile.ts";
 import { hypixelRequest } from "./hypixel.ts";
@@ -67,39 +67,70 @@ function accessoryFamily(metadata: any, internalId: string) {
   return normalizeId(metadata?.family ?? metadata?.upgradeGroup ?? metadata?.upgrade_group ?? metadata?.baseId ?? internalId);
 }
 
+function accessoryFamilyState(metadata: any, internalId: string) {
+  const hasFamilyField = Boolean(metadata?.family ?? metadata?.upgradeGroup ?? metadata?.upgrade_group ?? metadata?.baseId);
+  const explicit = hasFamilyField && metadata?.familyConfidence !== "id_fallback";
+  return {
+    family: accessoryFamily(metadata, internalId),
+    confidence: explicit ? "provider_backed" : "id_fallback",
+    sourceFields: explicit ? ["family", "upgradeGroup", "upgrade_group", "baseId"] : ["internalId"],
+    warnings: explicit ? [] : [{
+      code: "accessory_family_metadata_incomplete",
+      message: `No accessory upgrade-family metadata was available for ${normalizeId(internalId)}; treating the item ID as its own family.`,
+    }],
+  };
+}
+
 function metadataFromNeuResult(result: any) {
   const metadata = result.metadata ?? {};
+  const familyState = accessoryFamilyState({ familyConfidence: "id_fallback" }, result.internalId);
   return {
     internalId: result.internalId,
     displayName: metadata.displayname ?? result.internalId,
     rarity: metadata.tier ?? "COMMON",
     category: metadata.category ?? null,
-    family: accessoryFamily(metadata, result.internalId),
+    family: familyState.family,
+    familyConfidence: familyState.confidence,
+    familySourceFields: familyState.sourceFields,
     magicalPower: metadata.magicalPower ?? metadata.magical_power ?? null,
     provider: result.provider,
-    warnings: result.warnings ?? [],
+    warnings: [...(result.warnings ?? []), ...familyState.warnings],
   };
 }
 
 export function accessoryMetadataProviderResult(accessories: Array<Record<string, any>>, source = "test-fixture") {
-  return {
-    accessories: accessories.map((accessory) => ({
+  const normalizedAccessories = accessories.map((accessory) => {
+    const familyState = accessoryFamilyState(accessory, accessory.internalId);
+    return {
       internalId: normalizeId(accessory.internalId),
       displayName: accessory.displayName ?? accessory.internalId,
       rarity: normalizeRarity(accessory.rarity),
       category: accessory.category ?? "ACCESSORY",
-      family: accessoryFamily(accessory, accessory.internalId),
+      family: familyState.family,
+      familyConfidence: familyState.confidence,
+      familySourceFields: familyState.sourceFields,
       magicalPower: accessory.magicalPower ?? null,
       obtainable: accessory.obtainable ?? true,
-    })),
+      warnings: familyState.warnings,
+    };
+  });
+  const familyWarnings = normalizedAccessories.flatMap((entry) => entry.warnings);
+  return {
+    accessories: normalizedAccessories,
     provider: {
       source,
+      providerKind: "accessory-metadata",
       url: null,
       version: "local",
       fetchedAt: nowIso(),
       cacheStatus: "hit",
+      authority: source === "test-fixture" || source.includes("fixture") ? "fixture" : "local",
+      assumptions: [
+        "Accessory universe metadata is used for family grouping and missing-accessory candidates.",
+        "Family/dependency handling is complete only when the provider supplies explicit family or upgrade-chain fields.",
+      ],
     },
-    warnings: [],
+    warnings: familyWarnings,
   };
 }
 
@@ -108,10 +139,15 @@ export async function unavailableAccessoryMetadataProvider() {
     accessories: [],
     provider: {
       source: "accessory-metadata",
+      providerKind: "accessory-metadata",
       url: null,
       version: null,
       fetchedAt: nowIso(),
       cacheStatus: "unavailable",
+      authority: "unknown",
+      assumptions: [
+        "No accessory universe provider is available, so missing-accessory and family-chain results are partial.",
+      ],
     },
     warnings: [{
       code: "accessory_metadata_unavailable",
@@ -136,17 +172,29 @@ export async function hypixelAccessoryMetadataProvider(options: {
           rarity: normalizeRarity(item.tier),
           category: item.category,
           family: normalizeId(item.id),
+          familyConfidence: "id_fallback",
+          familySourceFields: ["internalId"],
           magicalPower: null,
           obtainable: true,
         })),
       provider: {
         source: "Hypixel Resources",
+        providerKind: "accessory-metadata",
         url: response.url ?? "https://api.hypixel.net/v2/resources/skyblock/items",
         version: null,
         fetchedAt: nowIso(),
         cacheStatus: "miss",
+        authority: "official",
+        license: "Official Hypixel public API resource response.",
+        assumptions: [
+          "Hypixel resources are authoritative for item existence, IDs, tier, and category fields exposed by the API.",
+          "Hypixel resources do not expose accessory upgrade-family dependency chains, so family handling falls back to item IDs.",
+        ],
       },
-      warnings: [],
+      warnings: [{
+        code: "accessory_family_metadata_incomplete",
+        message: "Hypixel item resources do not expose accessory upgrade-family dependency chains; richer family grouping requires a maintained third-party provider.",
+      }],
     };
   } catch (error) {
     return {
@@ -184,10 +232,15 @@ function enrichmentState(item: any) {
 function providerFreshness(...providers: any[]) {
   return providers.filter(Boolean).map((provider) => ({
     source: provider.source ?? "unknown",
+    providerKind: provider.providerKind ?? null,
     url: provider.url ?? null,
     version: provider.version ?? null,
     fetchedAt: provider.fetchedAt ?? null,
     cacheStatus: provider.cacheStatus ?? null,
+    stale: Boolean(provider.stale || provider.cacheStatus === "stale"),
+    authority: provider.authority ?? null,
+    license: provider.license ?? null,
+    assumptions: provider.assumptions ?? [],
   }));
 }
 
@@ -200,6 +253,18 @@ function priceWarningCodes() {
     "stale_cache",
     "cache_stale",
   ]);
+}
+
+function uniqueWarnings(warnings: any[]) {
+  const seen = new Set();
+  return warnings.filter((warning) => {
+    const key = `${warning?.code ?? "unknown"}|${warning?.message ?? ""}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function upgradeFromPrice(accessory: any, gain: number, price: any, budget: number | null) {
@@ -284,21 +349,26 @@ export async function calculateAccessoriesFromMember(member: any, options: {
       tier: item.rarity,
       category: item.category,
     }));
-    const family = accessoryFamily(providerMetadata, item.internalId);
+    const familyState = accessoryFamilyState(providerMetadata, item.internalId);
+    const family = familyState.family;
+    warnings.push(...(providerMetadata.warnings ?? []));
     const rarity = item.rarity ?? providerMetadata.rarity ?? "COMMON";
     const recombobulated = Boolean(item.recombobulated);
     const magicalPower = providerMetadata.magicalPower ?? magicalPowerFor(rarity, recombobulated);
     const record = {
       internalId: item.internalId,
       displayName: item.cleanName ?? item.displayName,
-      family,
+      family: familyState.family,
+      familyConfidence: providerMetadata.familyConfidence ?? familyState.confidence,
+      familyProviderFreshness: itemProviderFreshness(providerMetadata.provider ?? universeResult.provider),
+      familyWarnings: uniqueWarnings([...(providerMetadata.warnings ?? []), ...familyState.warnings]),
       rarity,
       recombobulated,
       enrichment: enrichmentState(item),
       magicalPower,
       exact: Boolean(providerMetadata.magicalPower),
       rawNbtPointer: item.rawNbtPointer,
-      warnings: item.warnings ?? [],
+      warnings: uniqueWarnings([...(item.warnings ?? []), ...(providerMetadata.warnings ?? []), ...familyState.warnings]),
     };
     owned.push(record);
     const current = bestByFamily.get(family);
@@ -327,6 +397,9 @@ export async function calculateAccessoriesFromMember(member: any, options: {
       internalId: entry.internalId,
       displayName: entry.displayName,
       family: entry.family,
+      familyConfidence: entry.familyConfidence ?? "id_fallback",
+      familyProviderFreshness: itemProviderFreshness(universeResult.provider),
+      familyWarnings: entry.warnings ?? [],
       rarity: entry.rarity,
       magicalPower: entry.magicalPower,
     }));
@@ -415,7 +488,7 @@ export async function calculateAccessoriesFromMember(member: any, options: {
     providerFreshness: providerFreshness(universeResult.provider, ...pricedMissing.map((entry) => entry.provider)),
     assumptions: ASSUMPTIONS,
     warnings: [
-      ...warnings,
+      ...uniqueWarnings(warnings),
       ...pricedMissing.flatMap((entry) => (entry.warnings ?? []).filter((warning: any) => warningCodes.has(warning.code))),
     ],
   };

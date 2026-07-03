@@ -15,9 +15,9 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Compact profile summaries, selected member extraction, overview metadata, and SkyCrypt URL generation.
 - Local config and memory storage outside the repo.
 - Inventory decoding for base64 gzipped NBT fields, including current and legacy inventory sections, wardrobe/loadout armor, backpacks, accessory bag, personal vault, and pets when exposed by the profile payload.
-- Deterministic item normalization for common SkyBlock item records, including IDs, rarity/category/count, reforges, enchantments, attributes, gemstones, dungeon modifiers, recombobulation, pet info, and metadata provider provenance where available.
-- Conservative sectioned networth for purse, bank, and resolved direct item prices, with unknown prices and assumptions surfaced.
-- Accessory bag analysis with duplicate detection, recombobulation/enrichment signals, estimated Magical Power, missing accessories when metadata is available, and price-driven coin-per-MP upgrade ranking.
+- Deterministic item normalization for common SkyBlock item records, including IDs, rarity/category/count, reforges, enchantments, attributes, gemstones, dungeon modifiers, recombobulation, pet info, metadata provider provenance, provider freshness, and modifier/pet/skin/dye/Museum uncertainty.
+- Conservative sectioned networth for purse, bank, and resolved direct item prices, with unknown prices, price-provider freshness, item metadata freshness, modifier uncertainty, and assumptions surfaced.
+- Accessory bag analysis with duplicate detection, recombobulation/enrichment signals, estimated Magical Power, missing accessories when metadata is available, provider-backed family confidence, incomplete family-chain warnings, and price-driven coin-per-MP upgrade ranking.
 - Shared progression section framework with skill, Catacombs, Slayer XP curves plus sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Outputs include source fields, missing-data warnings, formulas/tables, and provenance.
 - Weight and readiness estimators for broad profile comparison and dungeons, Slayer, Kuudra, Garden, and Mining readiness. Exact Senither/Lily formulas are explicitly marked unsupported until maintained formula tables are bundled.
 - Deterministic goal planner and next-upgrade output that compose networth, accessory upgrades, readiness, memories/config context, source freshness, assumptions, warnings, and route candidates for money, farming/Garden, Dungeon, Kuudra, and budgeted upgrade/source goals.
@@ -25,7 +25,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 
 ## Missing for SkyCrypt-Style Parity
 
-- SkyCrypt/SkyHelper-grade networth calculation, including modifier, pet-level, skin, dye, museum, and miscellaneous valuables.
+- SkyCrypt/SkyHelper-grade networth calculation, including maintained value providers for modifiers, pet levels, skins, dyes, museum, and miscellaneous valuables. SkyAgent now exposes uncertainty for these fields but still does not price them independently.
 - SkyHelper-grade missing accessories when a full maintained accessory universe is unavailable.
 - Compact startup context that includes all hidden storage, sacks, Museum signals, profile availability flags, and coop/member provenance.
 - Full SkyCrypt/SkyHelper-grade Museum donation planning for every special case and maintained donatable item table. SkyAgent now has conservative owned/hidden/missing candidate routing, but unsupported eligibility/value cases remain warning-backed.
@@ -40,16 +40,16 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Direct item IDs are valued through the price provider layer; unresolved prices are listed under `unknownPrices` and excluded from totals.
 - Purse and bank are included.
 - Inventory sections are separated for armor, equipment, wardrobe, inventory, ender chest, backpacks, accessory bag, personal vault, and pets when exposed by the Hypixel profile payload.
-- Item modifiers, pet levels, skins, dyes, attributes, enchantments, gemstones, recombobulation, and museum state are preserved as assumptions/context; combat readiness consumes gear/modifier presence as blockers, but these fields are not independently valued yet.
-- Pet XP is preserved, but exact pet level is not derived until a maintained pet XP formula/provider is bundled. Pet networth, pet score, and skin valuation are not claimed as SkyCrypt/SkyHelper parity.
-- Results include provider freshness and confidence metadata and should be treated as estimates, not authoritative SkyCrypt/SkyHelper replacements.
+- Item modifiers, pet XP/level inputs, skins, dyes, attributes, enchantments, gemstones, recombobulation, dungeon quality, and Museum eligibility/value uncertainty are preserved on normalized item and networth records with provider freshness. Combat readiness consumes gear/modifier presence as blockers, but these fields are not independently valued yet.
+- Pet XP is preserved, but exact pet level is not derived until a maintained pet XP formula/provider is bundled. Pet networth, pet score, and skin valuation are explicitly marked unsupported/observed-unvalued rather than treated as SkyCrypt/SkyHelper parity.
+- Results include provider freshness, provider authority, cache/fetched-at status, confidence metadata, unsupported-value warnings, and should be treated as estimates, not authoritative SkyCrypt/SkyHelper replacements.
 
 ## Current Accessory Limits
 
 - Magical Power is estimated from accessory rarity and recombobulation state unless provider metadata supplies an exact MP value.
 - Missing accessories require accessory universe metadata. When no full provider is configured, SkyAgent reports owned accessory state and a structured warning instead of inventing missing items.
 - Upgrade rankings include only resolved prices; unknown and partial candidate prices are surfaced but excluded from budget rankings.
-- Accessory family/upgrade-chain handling depends on explicit provider metadata. Hypixel item resources do not expose upgrade-chain families, so those IDs are treated as their own families until a richer maintained provider is configured.
+- Accessory family/upgrade-chain handling depends on explicit provider metadata. Outputs include `familyConfidence`, family provider freshness, and warnings when Hypixel item resources or fallback metadata cannot model upgrade-chain dependencies.
 - Budget rankings recommend only the next missing MP step per accessory family until provider metadata can model cumulative chain dependencies.
 
 ## Common Tool Signals
@@ -64,5 +64,5 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 2. Deepen Museum donation planning with maintained donatable item metadata, XP/value tiers, and special-case eligibility.
 3. Deepen target-aware readiness with maintained meta thresholds and route-specific alternatives beyond the current gear, pet, accessory, modifier, and budget blocker checks.
 4. Deepen route-specific planner modules with maintained profit/time models, crop/contest formulas, and richer source/snipe routing.
-5. Deepen provider metadata for pet levels, skins, dyes, Museum eligibility/value, accessory families, item modifiers, and price confidence.
+5. Add maintained provider adapters for exact pet level formulas, skin/dye value, Museum eligibility/value, accessory dependency chains, and modifier valuation.
 6. Add cross-surface parity tests so CLI, MCP, gateway, TUI, docs, and skills stay aligned.

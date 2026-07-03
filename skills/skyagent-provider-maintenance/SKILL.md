@@ -32,6 +32,8 @@ Use this skill when currentness, provider quality, stale formulas, parity drift,
 - Treat community metas, prices, routes, boss requirements, and rules as time-sensitive.
 - Verify live web/wiki/provider data when metas, prices, formulas, API fields, or game rules may have changed.
 - Do not upgrade an estimate to exact without a maintained formula/provider.
+- Treat Hypixel API profile/resources as authoritative only for fields they expose; accessory family chains, modifier valuation, pet levels, skins/dyes, and Museum values need maintained provider contracts or must remain unsupported/uncertain.
+- Preserve provider authority, license/source assumption, fetched-at/cache status, stale status, and unsupported-value warnings when comparing SkyAgent output to SkyCrypt/SkyHelper-style tools.
 - Preserve source freshness, uncertainty, provider fallback, and stale-cache warnings in the answer.
 - Keep LLM provider keys, virtual keys, endpoint auth material, and budgets redacted unless the user is explicitly entering a secret into local config.
 - Update `docs/parity.md` when provider gaps or parity assumptions change.

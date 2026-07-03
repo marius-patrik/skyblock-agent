@@ -120,7 +120,14 @@ describe("networth calculation", () => {
       section: "wardrobe",
       internalId: "UNKNOWN_VALUABLE",
       count: 2,
+      metadataProviderFreshness: expect.objectContaining({
+        source: "fixture-neu",
+        providerKind: "item-metadata",
+        cacheStatus: "hit",
+      }),
     });
+    expect(result.sections[0].metadataProviderFreshness).toContainEqual(expect.objectContaining({ source: "fixture-neu" }));
+    expect(result.metadataProviderFreshness).toContainEqual(expect.objectContaining({ source: "fixture-neu" }));
     expect(result.confidence).toBe("low");
   });
 
@@ -292,5 +299,53 @@ describe("networth calculation", () => {
     expect(result.sections[0].warnings).toContainEqual(expect.objectContaining({ code: "stale_cache" }));
     expect(armor.providerFreshness).toContainEqual(expect.objectContaining({ source: "fixture-prices", cacheStatus: "stale", stale: true }));
     expect(armor.confidence).toBe("low");
+  });
+
+  test("exposes modifier uncertainty and metadata freshness for item networth", async () => {
+    const petStack = stack("pets", "PET", 1, "§6[Lvl 100] Sheep");
+    (petStack as any).extraAttributes = {
+      id: "PET",
+      petInfo: JSON.stringify({
+        type: "SHEEP",
+        tier: "LEGENDARY",
+        exp: 1_000_000,
+        heldItem: "PET_ITEM_TEXTBOOK",
+        skin: "SHEEP_BLACK",
+      }),
+      dye_item: "PURE_BLACK_DYE",
+    };
+
+    const result = await calculateNetworthFromInventory({
+      sections: [{
+        section: "pets",
+        label: "Pets",
+        available: true,
+        sourcePath: "inventory.pet_inventory",
+        items: [petStack],
+        warnings: [],
+      }],
+      priceProvider: priceProvider({ PET: 1_000_000 }),
+      metadataProvider: (internalId) => metadataProviderResult(internalId, {
+        displayname: "§6Pet",
+        tier: "LEGENDARY",
+        category: "PET",
+      }, "fixture-neu"),
+      includeItems: true,
+    });
+
+    expect(result.metadataProviderFreshness).toContainEqual(expect.objectContaining({
+      source: "fixture-neu",
+      providerKind: "item-metadata",
+      cacheStatus: "hit",
+    }));
+    expect(result.sections[0].metadataProviderFreshness).toContainEqual(expect.objectContaining({ source: "fixture-neu" }));
+    expect(result.sections[0].items[0].modifierUncertainty).toMatchObject({
+      petLevel: { status: "unsupported_formula", estimated: true },
+      skin: { status: "observed_unvalued", value: "SHEEP_BLACK" },
+      dye: { status: "observed_unvalued", value: "PURE_BLACK_DYE" },
+      museum: { status: "unsupported_eligibility_value" },
+      valuation: { status: "unsupported_modifier_value" },
+    });
+    expect(result.sections[0].items[0].warnings).toContainEqual(expect.objectContaining({ code: "pet_level_formula_unavailable" }));
   });
 });

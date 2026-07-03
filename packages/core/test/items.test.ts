@@ -72,7 +72,7 @@ describe("item normalization", () => {
     expect(normalized.enchantments).toEqual({ ultimate_wise: 5, smite: 7 });
   });
 
-  test("snapshots normalized record shape", () => {
+  test("exposes provider freshness and modifier uncertainty", () => {
     const normalized = normalizeItemStackRecord(stack("ASPECT_OF_THE_END", {
       modifier: "warped",
       enchantments: { sharpness: 5 },
@@ -82,52 +82,37 @@ describe("item normalization", () => {
       category: "SWORD",
     }));
 
-    expect(normalized).toMatchInlineSnapshot(`
-      {
-        "attributes": {},
-        "cakeYear": null,
-        "category": "SWORD",
-        "cleanName": "Aspect of the End",
-        "count": 1,
-        "displayName": "§6ASPECT_OF_THE_END",
-        "dungeonItemQuality": null,
-        "dungeonized": false,
-        "dye": null,
-        "enchantments": {
-          "sharpness": 5,
+    expect(normalized).toMatchObject({
+      internalId: "ASPECT_OF_THE_END",
+      cleanName: "Aspect of the End",
+      rarity: "RARE",
+      category: "SWORD",
+      metadataProvider: {
+        source: "fixture-neu",
+        url: null,
+        version: "test",
+      },
+      metadataProviderFreshness: {
+        source: "fixture-neu",
+        providerKind: "item-metadata",
+        fetchedAt: "2026-07-01T00:00:00.000Z",
+        cacheStatus: "hit",
+      },
+      modifierUncertainty: {
+        enchantments: {
+          status: "observed_profile_modifier",
+          value: { sharpness: 5 },
         },
-        "fumingPotatoCount": 0,
-        "gemstoneSlots": [],
-        "gemstones": {},
-        "heldItem": null,
-        "hotPotatoCount": 0,
-        "internalId": "ASPECT_OF_THE_END",
-        "masterStars": 0,
-        "metadataProvider": {
-          "source": "fixture-neu",
-          "url": null,
-          "version": "test",
+        valuation: {
+          status: "unsupported_modifier_value",
+          estimated: true,
         },
-        "petItem": null,
-        "rarity": "RARE",
-        "rawNbtPointer": {
-          "containerId": null,
-          "index": 0,
-          "slot": 0,
-          "sourcePath": "inventory.inv_contents",
+        museum: {
+          status: "unsupported_eligibility_value",
+          estimated: true,
         },
-        "recombobulated": false,
-        "reforge": "warped",
-        "rune": null,
-        "skin": null,
-        "specialModifiers": {
-          "extraKeys": [],
-          "petInfo": null,
-        },
-        "stars": 0,
-        "warnings": [],
-      }
-    `);
+      },
+    });
   });
 
   test("normalizes armor dungeon quality", () => {
@@ -147,7 +132,7 @@ describe("item normalization", () => {
     expect(normalized.dye).toBe("PURE_BLACK_DYE");
   });
 
-  test("keeps normalized records deterministic across provider fetch times", () => {
+  test("keeps stable provider identity deterministic while exposing provider freshness", () => {
     const first = provider("HYPERION", { tier: "LEGENDARY", category: "SWORD" });
     const second = {
       ...first,
@@ -158,7 +143,12 @@ describe("item normalization", () => {
       },
     };
 
-    expect(normalizeItemStackRecord(stack("HYPERION"), first)).toEqual(normalizeItemStackRecord(stack("HYPERION"), second));
+    const firstRecord = normalizeItemStackRecord(stack("HYPERION"), first);
+    const secondRecord = normalizeItemStackRecord(stack("HYPERION"), second);
+
+    expect(firstRecord.metadataProvider).toEqual(secondRecord.metadataProvider);
+    expect(firstRecord.metadataProviderFreshness.fetchedAt).not.toBe(secondRecord.metadataProviderFreshness.fetchedAt);
+    expect(firstRecord.modifierUncertainty.providerFreshness.fetchedAt).not.toBe(secondRecord.modifierUncertainty.providerFreshness.fetchedAt);
   });
 
   test("normalizes accessories, gemstones, and attributes", () => {
@@ -215,7 +205,8 @@ describe("item normalization", () => {
     expect(result.items[0].rarity).toBe("LEGENDARY");
     expect(result.items[1].warnings[0].code).toBe("metadata_unavailable");
     expect(result.providerProvenance[0].provider.fetchedAt).toBe("2026-07-01T00:00:00.000Z");
-    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings.map((warning) => warning.code)).toContain("metadata_unavailable");
+    expect(result.warnings.map((warning) => warning.code)).toContain("modifier_metadata_unavailable");
   });
 });
 

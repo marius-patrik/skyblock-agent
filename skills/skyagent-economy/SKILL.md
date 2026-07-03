@@ -17,7 +17,7 @@ Use this skill when the user asks about coins, prices, networth, Bazaar, auction
 - Use `skyblock_lowest_bin` for auctionable item LBIN and bounded Hypixel auction-scan candidates.
 - Use `skyblock_price_history` for historical CoflNet-compatible context, trend checks, and volatility context.
 - Use `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_auctions_ended`, and `skyblock_firesales` for live economy surfaces.
-- Use `skyblock_networth` for full sectioned networth, purse/bank/item totals, unknown prices, assumptions, and provider freshness.
+- Use `skyblock_networth` for full sectioned networth, purse/bank/item totals, unknown prices, assumptions, price provider freshness, metadata provider freshness, and modifier uncertainty.
 - Use `skyblock_item_networth` for one inventory section such as armor, equipment, wardrobe, backpacks, accessory bag, or pets.
 - For agent summaries, pass bounded controls such as `maxItems`, `timeoutMs`, and `includeItems: false` when full item arrays are not required. Request item-level output only for explicit detail/debug work.
 - Use `$skyagent-context-engine` when networth or price advice should be combined with cached profile context, objectives, or provider freshness.
@@ -29,10 +29,11 @@ Use this skill when the user asks about coins, prices, networth, Bazaar, auction
 
 - Treat `candidatePrice` as partial unless `price` is non-null.
 - Treat networth `status` or section `valuationStatus` of `partial` as incomplete coverage caused by bounds, timeout, provider failure, or unresolved prices; carry the warning codes forward instead of treating totals as exhaustive.
-- Carry provider freshness, confidence, fallback chain, cache status, stale status, and warnings into recommendations.
+- Carry provider freshness, metadata freshness, provider authority, confidence, fallback chain, cache status, stale status, modifier uncertainty, and warnings into recommendations.
 - Call out third-party uncertainty for CoflNet-compatible LBIN/history and any community/provider-derived data.
 - Treat prices as volatile; avoid strong buy/sell timing claims without recent provider data and history.
 - Do not invent prices for unknown or unsupported items.
+- Do not price modifiers, pet levels, skins, dyes, or Museum eligibility/value from normalized item fields unless a resolved maintained provider value is present.
 - Do not add unknown prices into networth totals; list them as missing value coverage instead.
 - When provider data is stale or low confidence, describe the value as advisory rather than definitive.
 - For budget-sensitive advice, compare resolved price against the stated budget and exclude unresolved or over-budget items from buyable recommendations.

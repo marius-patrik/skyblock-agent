@@ -30,9 +30,9 @@ Use this skill for talismans/accessories, Magical Power, accessory-bag state, ne
 - If accessory output is `partial`, treat cheapest-missing and buyable lists as a bounded first pass and preserve limit, timeout, stale-cache, and missing-price warnings.
 - Treat full networth and accessory-bag item networth as conservative because unresolved prices, modifier valuation, and provider confidence can change totals.
 - Do not recommend unresolved, missing-price, or over-budget upgrades as buyable.
-- Carry accessory metadata-provider limitations, provider confidence, fallback chain, and stale-cache warnings into the answer.
+- Carry accessory metadata-provider limitations, family confidence, family provider freshness, provider authority, fallback chain, and stale-cache warnings into the answer.
 - Rank budget-constrained upgrades by resolved coin-per-MP, but preserve prerequisites and duplicate-family rules before recommending a purchase.
 - If prices are missing, do not claim a cheapest upgrade or coin-per-MP route; identify the missing price coverage instead.
-- If the accessory universe metadata is incomplete, describe missing-accessory coverage as partial rather than complete.
+- If the accessory universe metadata or family/dependency metadata is incomplete, describe missing-accessory and upgrade-chain coverage as partial rather than complete.
 - Treat third-party price and metadata providers as uncertain and economy-sensitive.
 - Refresh context after accessory purchases before recalculating MP, next upgrades, or readiness.

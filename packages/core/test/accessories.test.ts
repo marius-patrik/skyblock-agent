@@ -123,6 +123,14 @@ describe("accessory analysis", () => {
     expect(result.duplicates).toHaveLength(1);
     expect(result.activeAccessories.find((entry) => entry.internalId === "SPEED_RING")?.recombobulated).toBe(true);
     expect(result.activeAccessories.find((entry) => entry.internalId === "SPEED_RING")?.enrichment.enriched).toBe(true);
+    expect(result.activeAccessories.find((entry) => entry.internalId === "SPEED_RING")).toMatchObject({
+      family: "SPEED",
+      familyConfidence: "provider_backed",
+      familyProviderFreshness: {
+        providerKind: "accessory-metadata",
+        source: "fixture-accessories",
+      },
+    });
     expect(result.magicalPower.estimated).toBe(11);
     expect(result.missing.map((entry) => entry.internalId).sort()).toEqual(["SHINY_RELIC", "SPEED_ARTIFACT"]);
   });
@@ -305,6 +313,30 @@ describe("accessory analysis", () => {
     expect(result.missing).toEqual([]);
   });
 
+  test("does not treat generic item metadata family fields as accessory-chain authority", async () => {
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([
+      item(0, "GENERIC_FAMILY_TALISMAN", "COMMON"),
+    ]), {
+      metadataProvider: (internalId) => metadataProviderResult(internalId, {
+        displayname: "Generic Family Talisman",
+        tier: "COMMON",
+        category: "ACCESSORY",
+        family: "GENERIC_METADATA_FAMILY",
+        baseId: "GENERIC_METADATA_BASE",
+      }, "fixture-neu"),
+      accessoryMetadataProvider: unavailableAccessoryMetadataProvider,
+      priceProvider: priceProvider({}),
+    });
+
+    expect(result.activeAccessories[0]).toMatchObject({
+      internalId: "GENERIC_FAMILY_TALISMAN",
+      family: "GENERIC_FAMILY_TALISMAN",
+      familyConfidence: "id_fallback",
+    });
+    expect(result.activeAccessories[0].familyWarnings).toContainEqual(expect.objectContaining({ code: "accessory_family_metadata_incomplete" }));
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_family_metadata_incomplete" }));
+  });
+
   test("maps Hypixel item resources into accessory universe metadata", async () => {
     const result = await hypixelAccessoryMetadataProvider({
       requestImpl: async () => ({
@@ -321,6 +353,32 @@ describe("accessory analysis", () => {
 
     expect(result.accessories.map((entry) => entry.internalId)).toEqual(["SPEED_TALISMAN", "SPEED_RING"]);
     expect(result.accessories[0].family).toBe("SPEED_TALISMAN");
+    expect(result.accessories[0].familyConfidence).toBe("id_fallback");
     expect(result.provider.source).toBe("Hypixel Resources");
+    expect(result.provider).toMatchObject({
+      providerKind: "accessory-metadata",
+      authority: "official",
+    });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_family_metadata_incomplete" }));
+  });
+
+  test("warns when maintained accessory universe entries fall back to item-id families", async () => {
+    const universe = () => accessoryMetadataProviderResult([
+      { internalId: "FALLBACK_TALISMAN", displayName: "Fallback Talisman", rarity: "COMMON" },
+    ], "fixture-accessories");
+
+    const result = await calculateAccessoriesFromMember(memberWithAccessories([]), {
+      metadataProvider,
+      accessoryMetadataProvider: universe,
+      priceProvider: priceProvider({ FALLBACK_TALISMAN: 10_000 }),
+    });
+
+    expect(result.missing[0]).toMatchObject({
+      internalId: "FALLBACK_TALISMAN",
+      family: "FALLBACK_TALISMAN",
+      familyConfidence: "id_fallback",
+      familyWarnings: [expect.objectContaining({ code: "accessory_family_metadata_incomplete" })],
+    });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "accessory_family_metadata_incomplete" }));
   });
 });

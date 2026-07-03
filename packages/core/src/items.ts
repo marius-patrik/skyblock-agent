@@ -4,10 +4,15 @@ const NEU_RAW_BASE = "https://raw.githubusercontent.com/NotEnoughUpdates/NotEnou
 
 export type ProviderMetadata = {
   source: string;
+  providerKind?: string;
   url?: string;
   version?: string;
   fetchedAt: string;
-  cacheStatus: "hit" | "miss" | "unavailable" | "disabled";
+  cacheStatus: "hit" | "miss" | "unavailable" | "disabled" | "stale";
+  stale?: boolean;
+  authority?: "official" | "third-party" | "fixture" | "local" | "unknown";
+  license?: string;
+  assumptions?: string[];
 };
 
 export type ItemMetadataResult = {
@@ -61,9 +66,15 @@ export function metadataProviderResult(internalId: string, metadata: Record<stri
     metadata,
     provider: {
       source,
+      providerKind: "item-metadata",
       version: "local",
       fetchedAt: nowIso(),
       cacheStatus: metadata ? "hit" : "unavailable",
+      authority: source === "test-fixture" || source.includes("fixture") ? "fixture" : "local",
+      assumptions: [
+        "Fixture/local metadata is used for deterministic tests or local fallback behavior.",
+        "Item metadata does not imply item value unless a price provider supplies a resolved price.",
+      ],
     },
     warnings: metadata ? [] : [{
       code: "metadata_unavailable",
@@ -90,8 +101,15 @@ export async function neuItemMetadata(internalId: string, options: { fetchImpl?:
   const fetchImpl = options.fetchImpl ?? fetch;
   const providerBase = {
     source: "NotEnoughUpdates-REPO",
+    providerKind: "item-metadata",
     url,
     fetchedAt: nowIso(),
+    authority: "third-party" as const,
+    license: "Not bundled; fetched from the public NotEnoughUpdates-REPO item JSON when requested.",
+    assumptions: [
+      "NotEnoughUpdates item data is a community metadata provider, not authoritative profile state.",
+      "Provider fields can describe names, tiers, categories, and static item metadata, but modifier valuation still requires separate maintained providers.",
+    ],
   };
 
   try {
@@ -180,6 +198,25 @@ function stableProviderIdentity(provider: ProviderMetadata) {
     source: provider.source,
     url: provider.url ?? null,
     version: provider.version ?? null,
+    authority: provider.authority ?? "unknown",
+  };
+}
+
+export function providerFreshness(provider: ProviderMetadata | null | undefined) {
+  if (!provider) {
+    return null;
+  }
+  return {
+    source: provider.source,
+    providerKind: provider.providerKind ?? "item-metadata",
+    url: provider.url ?? null,
+    version: provider.version ?? null,
+    fetchedAt: provider.fetchedAt ?? null,
+    cacheStatus: provider.cacheStatus ?? null,
+    stale: Boolean(provider.stale || provider.cacheStatus === "stale"),
+    authority: provider.authority ?? "unknown",
+    license: provider.license ?? null,
+    assumptions: provider.assumptions ?? [],
   };
 }
 
@@ -207,6 +244,73 @@ function modifierSummary(extra: Record<string, any>, petInfo: Record<string, any
   };
 }
 
+function hasEntries(value: any) {
+  return value && typeof value === "object" && Object.keys(value).length > 0;
+}
+
+function uncertainty(status: string, value: any, provider: ProviderMetadata, warnings: Array<{ code: string; message: string }> = [], estimated = false) {
+  return {
+    status,
+    value: value ?? null,
+    estimated,
+    provider: stableProviderIdentity(provider),
+    providerFreshness: providerFreshness(provider),
+    warnings,
+  };
+}
+
+function modifierUncertainty(modifiers: ReturnType<typeof modifierSummary>, metadata: Record<string, any> | null, provider: ProviderMetadata, petInfo: Record<string, any> | null) {
+  const metadataAvailable = Boolean(metadata);
+  const metadataStatus = metadataAvailable ? "provider_backed" : "metadata_unavailable";
+  const staticWarning = metadataAvailable ? [] : [{
+    code: "modifier_metadata_unavailable",
+    message: "Item metadata provider was unavailable; profile-observed modifiers are preserved but static metadata confidence is degraded.",
+  }];
+  const petWarnings = petInfo ? [{
+    code: "pet_level_formula_unavailable",
+    message: "Pet XP is preserved from profile data, but SkyAgent has no maintained pet level formula provider in this slice.",
+  }] : [];
+  const skinWarnings = modifiers.skin ? [{
+    code: "skin_value_unsupported",
+    message: "Skin presence is observed from profile data, but skin value is not independently priced without a maintained provider.",
+  }] : [];
+  const dyeWarnings = modifiers.dye ? [{
+    code: "dye_value_unsupported",
+    message: "Dye presence is observed from profile data, but dye value is not independently priced without a maintained provider.",
+  }] : [];
+
+  return {
+    providerFreshness: providerFreshness(provider),
+    metadata: uncertainty(metadataStatus, metadataAvailable, provider, staticWarning, !metadataAvailable),
+    petLevel: uncertainty(petInfo ? "unsupported_formula" : "not_pet", petInfo?.exp ?? null, provider, petWarnings, true),
+    skin: uncertainty(modifiers.skin ? "observed_unvalued" : "not_present", modifiers.skin, provider, skinWarnings, true),
+    dye: uncertainty(modifiers.dye ? "observed_unvalued" : "not_present", modifiers.dye, provider, dyeWarnings, true),
+    gemstones: uncertainty(hasEntries(modifiers.gemstones) || modifiers.gemstoneSlots.length ? "observed_profile_modifier" : "not_present", modifiers.gemstones, provider, [], !metadataAvailable),
+    attributes: uncertainty(hasEntries(modifiers.attributes) ? "observed_profile_modifier" : "not_present", modifiers.attributes, provider, [], !metadataAvailable),
+    enchantments: uncertainty(hasEntries(modifiers.enchantments) ? "observed_profile_modifier" : "not_present", modifiers.enchantments, provider, [], !metadataAvailable),
+    dungeonQuality: uncertainty(modifiers.dungeonized || modifiers.dungeonItemQuality !== null || modifiers.stars > 0 || modifiers.masterStars > 0 ? "observed_profile_modifier" : "not_present", {
+      stars: modifiers.stars,
+      masterStars: modifiers.masterStars,
+      dungeonized: modifiers.dungeonized,
+      dungeonItemQuality: modifiers.dungeonItemQuality,
+    }, provider, [], !metadataAvailable),
+    museum: uncertainty("unsupported_eligibility_value", metadata?.museum ?? metadata?.museumData ?? null, provider, [{
+      code: "museum_value_unsupported",
+      message: "Museum eligibility/value is not derived from item metadata unless a maintained Museum provider supplies it.",
+    }], true),
+    valuation: uncertainty("unsupported_modifier_value", null, provider, [{
+      code: "modifier_value_unsupported",
+      message: "Modifier-level value is not independently calculated; only direct item ID price providers contribute to networth totals.",
+    }], true),
+  };
+}
+
+function modifierWarnings(uncertaintyResult: any) {
+  return Object.values(uncertaintyResult)
+    .flatMap((entry: any) => Array.isArray(entry?.warnings) ? entry.warnings : [])
+    .filter((warning: any) => warning.code !== "museum_value_unsupported" && warning.code !== "modifier_value_unsupported");
+}
+
 export function normalizeItemStackRecord(stack: Record<string, any>, metadataResult: ItemMetadataResult = metadataProviderResult(stack.internalId, null)) {
   const extra = stack.extraAttributes ?? {};
   const metadata = metadataResult.metadata;
@@ -214,6 +318,7 @@ export function normalizeItemStackRecord(stack: Record<string, any>, metadataRes
   const petInfo = parsePetInfo(extra);
   const modifiers = modifierSummary(extra, petInfo);
   const displayName = stack.displayName ?? metadata?.displayname ?? internalId;
+  const modifierUncertaintyResult = modifierUncertainty(modifiers, metadata, metadataResult.provider, petInfo);
 
   return {
     internalId,
@@ -261,7 +366,9 @@ export function normalizeItemStackRecord(stack: Record<string, any>, metadataRes
       containerId: stack.containerId ?? null,
     },
     metadataProvider: stableProviderIdentity(metadataResult.provider),
-    warnings: metadataResult.warnings,
+    metadataProviderFreshness: providerFreshness(metadataResult.provider),
+    modifierUncertainty: modifierUncertaintyResult,
+    warnings: [...metadataResult.warnings, ...modifierWarnings(modifierUncertaintyResult)],
   };
 }
 

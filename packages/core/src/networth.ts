@@ -121,6 +121,36 @@ function providerFreshnessFromItems(items: any[]) {
   return [...providers.values()];
 }
 
+function metadataFreshnessFromItems(items: any[]) {
+  const providers = new Map();
+  for (const item of items) {
+    const provider = item.metadataProviderFreshness;
+    if (!provider) {
+      continue;
+    }
+    const key = [
+      provider.source ?? "unknown",
+      provider.providerKind ?? "item-metadata",
+      provider.url ?? "",
+    ].join("|");
+    const existing = providers.get(key);
+    providers.set(key, {
+      source: provider.source ?? "unknown",
+      providerKind: provider.providerKind ?? "item-metadata",
+      url: provider.url ?? null,
+      version: provider.version ?? null,
+      cacheStatus: provider.cacheStatus ?? null,
+      stale: Boolean(provider.stale),
+      fetchedAt: provider.fetchedAt ?? null,
+      authority: provider.authority ?? "unknown",
+      license: provider.license ?? null,
+      assumptions: provider.assumptions ?? [],
+      itemCount: (existing?.itemCount ?? 0) + 1,
+    });
+  }
+  return [...providers.values()];
+}
+
 function timeoutPriceResult(timeoutMs: number | undefined) {
   return {
     price: null,
@@ -182,13 +212,13 @@ export async function calculateNetworthFromInventory(input: {
   const ignoredItems = [];
   const unknownPrices = [];
   const allWarnings = [];
-  const allValuedItems = [];
+  const allProcessedItems = [];
   let pricedAttemptCount = 0;
   let partial = false;
 
   for (const section of input.sections ?? []) {
     const normalized = await normalizeItemStacks(section.items ?? [], { metadataProvider: input.metadataProvider });
-    const valuedItems = [];
+    const processedItems = [];
     const sectionItemWarnings = [];
     let sectionTotal = 0;
     let sectionPartial = false;
@@ -254,7 +284,7 @@ export async function calculateNetworthFromInventory(input: {
         ...(item.warnings ?? []).map((entry) => ({ ...entry, source: "metadata" })),
         ...(price?.warnings ?? []).map((entry) => ({ ...entry, source: "price" })),
       ];
-      const valued = {
+      const processed = {
         section: section.section,
         internalId: item.internalId,
         displayName: item.displayName,
@@ -268,6 +298,8 @@ export async function calculateNetworthFromInventory(input: {
         confidence: price?.confidence ?? "none",
         priceProvider: price?.provider ?? null,
         fallbackChain: price?.fallbackChain ?? [],
+        metadataProvider: item.metadataProvider,
+        metadataProviderFreshness: item.metadataProviderFreshness,
         modifiers: {
           reforge: item.reforge,
           stars: item.stars,
@@ -281,12 +313,13 @@ export async function calculateNetworthFromInventory(input: {
           petItem: item.petItem,
           heldItem: item.heldItem,
         },
+        modifierUncertainty: item.modifierUncertainty,
         rawNbtPointer: item.rawNbtPointer,
         warnings: itemWarnings,
       };
 
-      valuedItems.push(valued);
-      allValuedItems.push(valued);
+      processedItems.push(processed);
+      allProcessedItems.push(processed);
       sectionItemWarnings.push(...itemWarnings.map((entry) => ({ ...entry, section: section.section, internalId: item.internalId })));
       if (unitPrice === null) {
         unknownPrices.push({
@@ -296,10 +329,13 @@ export async function calculateNetworthFromInventory(input: {
           count,
           candidateUnitPrice: price?.candidatePrice ?? null,
           provider: price?.provider ?? null,
+          metadataProvider: item.metadataProvider,
+          metadataProviderFreshness: item.metadataProviderFreshness,
+          modifierUncertainty: item.modifierUncertainty,
           warnings: price?.warnings ?? [],
         });
       } else {
-        sectionTotal += valued.total;
+        sectionTotal += processed.total;
       }
     }
 
@@ -310,7 +346,7 @@ export async function calculateNetworthFromInventory(input: {
     ];
     allWarnings.push(...sectionWarnings);
     const sectionUnknownPrices = unknownPrices.filter((item) => item.section === section.section);
-    const sectionPricedItems = valuedItems.filter((item) => item.unitPrice !== null);
+    const sectionPricedItems = processedItems.filter((item) => item.unitPrice !== null);
     sections.push({
       section: section.section,
       label: section.label ?? section.section,
@@ -319,17 +355,18 @@ export async function calculateNetworthFromInventory(input: {
       total: roundCoins(sectionTotal),
       valuationStatus: sectionPartial ? "partial" : "complete",
       itemCount: normalized.itemCount,
-      pricedCount: valuedItems.filter((item) => item.unitPrice !== null).length,
-      unknownCount: valuedItems.filter((item) => item.unitPrice === null).length,
+      pricedCount: processedItems.filter((item) => item.unitPrice !== null).length,
+      unknownCount: processedItems.filter((item) => item.unitPrice === null).length,
       ignoredCount: ignoredItems.filter((item) => item.section === section.section).length,
-      items: includeItems ? valuedItems : [],
-      providerFreshness: providerFreshnessFromItems(valuedItems),
+      items: includeItems ? processedItems : [],
+      providerFreshness: providerFreshnessFromItems(processedItems),
+      metadataProviderFreshness: metadataFreshnessFromItems(processedItems),
       confidence: aggregateConfidence(sectionPricedItems, sectionUnknownPrices, sectionWarnings),
       warnings: sectionWarnings,
     });
   }
 
-  const pricedItems = allValuedItems.filter((item) => item.unitPrice !== null);
+  const pricedItems = allProcessedItems.filter((item) => item.unitPrice !== null);
   const itemTotal = roundCoins(sections.reduce((total, section) => total + section.total, 0));
   const total = roundCoins(currencyTotal + itemTotal);
 
@@ -355,7 +392,8 @@ export async function calculateNetworthFromInventory(input: {
     ignoredItems,
     unknownPrices,
     warnings: allWarnings,
-    providerFreshness: providerFreshnessFromItems(allValuedItems),
+    providerFreshness: providerFreshnessFromItems(allProcessedItems),
+    metadataProviderFreshness: metadataFreshnessFromItems(allProcessedItems),
     assumptions: ASSUMPTIONS,
     confidence: aggregateConfidence(pricedItems, unknownPrices, allWarnings),
     rateLimit: input.rateLimit ?? null,
@@ -412,6 +450,7 @@ export function itemNetworthFromResult(result: any, sectionName: string) {
     assumptions: result.assumptions,
     confidence: sectionResult?.confidence ?? aggregateConfidence(pricedItems, unknownPrices, warnings),
     providerFreshness: sectionResult?.providerFreshness ?? providerFreshnessFromItems(sectionResult?.items ?? []),
+    metadataProviderFreshness: sectionResult?.metadataProviderFreshness ?? metadataFreshnessFromItems(sectionResult?.items ?? []),
     rateLimit: result.rateLimit,
   };
 }
