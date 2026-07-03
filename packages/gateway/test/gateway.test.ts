@@ -764,6 +764,14 @@ test("analysis routes mirror core contracts and preserve warnings", async () => 
       accessoriesForPlayer: async () => ({ magicalPower: 10, warnings }),
       missingAccessoriesForPlayer: async () => ({ missing: [], warnings }),
       accessoryUpgradesForPlayer: async (_player, _profile, budget) => ({ budget, upgrades: [], warnings }),
+      museumDonationPlanForPlayer: async (goal, _player, _profile, options) => ({
+        goal,
+        budget: options.budget,
+        maxPriceLookups: options.maxPriceLookups,
+        timeoutMs: options.timeoutMs,
+        persistObjectives: options.persistObjectives,
+        warnings,
+      }),
       profileSectionForPlayer: async (name) => ({ name, warnings }),
       progressionForPlayer: async () => ({ skills: [], warnings }),
       readinessForPlayer: async (area) => ({ area, status: "unknown", warnings }),
@@ -799,6 +807,18 @@ test("analysis routes mirror core contracts and preserve warnings", async () => 
   const plan = await gateway.handle(request("/plan?goal=f7&budget=2000", "test-token")).then((response) => response.json());
   expect(plan.plan).toMatchObject({ goal: "f7", budget: 2000, warnings });
 
+  const museumPlan = await gateway.handle(request("/museum/plan?goal=Museum%20GIANTS_SWORD&budget=3000&maxPriceLookups=2&timeoutMs=500", "test-token")).then((response) => response.json());
+  expect(museumPlan.museumPlan).toMatchObject({ goal: "Museum GIANTS_SWORD", budget: 3000, maxPriceLookups: 2, timeoutMs: 500, persistObjectives: false, warnings });
+
+  const persistedMuseumPlan = await gateway.handle(request("/museum/plan", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ goal: "Museum GIANTS_SWORD", budget: 3000, maxPriceLookups: 2, timeoutMs: 500, persistObjectives: true }),
+  })).then((response) => response.json());
+  expect(persistedMuseumPlan.museumPlan).toMatchObject({ goal: "Museum GIANTS_SWORD", budget: 3000, maxPriceLookups: 2, timeoutMs: 500, persistObjectives: true, warnings });
+
+  const museumPlanNoPersist = await gateway.handle(request("/museum/plan?goal=Museum%20GIANTS_SWORD", "test-token")).then((response) => response.json());
+  expect(museumPlanNoPersist.museumPlan.persistObjectives).toBe(false);
+
   const resource = await gateway.handle(request("/resource?kind=items", "test-token")).then((response) => response.json());
   expect(resource.resource.endpoint).toBe("resources/skyblock/items");
   const providerStatus = await gateway.handle(request("/provider-status", "test-token")).then((response) => response.json());
@@ -810,6 +830,21 @@ test("analysis routes mirror core contracts and preserve warnings", async () => 
   expect(invalid.status).toBe(400);
   const emptyBudget = await gateway.handle(request("/accessories/upgrades?budget=", "test-token"));
   expect(emptyBudget.status).toBe(400);
+  const invalidMuseumBudget = await gateway.handle(request("/museum/plan?goal=museum&budget=", "test-token"));
+  expect(invalidMuseumBudget.status).toBe(400);
+  const invalidMuseumMaxPriceLookups = await gateway.handle(request("/museum/plan?goal=museum&maxPriceLookups=nope", "test-token"));
+  expect(invalidMuseumMaxPriceLookups.status).toBe(400);
+  const decimalMuseumMaxPriceLookups = await gateway.handle(request("/museum/plan?goal=museum&maxPriceLookups=1.5", "test-token"));
+  expect(decimalMuseumMaxPriceLookups.status).toBe(400);
+  const invalidMuseumTimeout = await gateway.handle(request("/museum/plan?goal=museum&timeoutMs=0", "test-token"));
+  expect(invalidMuseumTimeout.status).toBe(400);
+  const invalidMuseumPersist = await gateway.handle(request("/museum/plan?goal=museum&persistObjectives=true", "test-token"));
+  expect(invalidMuseumPersist.status).toBe(405);
+  const missingPostPersist = await gateway.handle(request("/museum/plan", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ goal: "museum" }),
+  }));
+  expect(missingPostPersist.status).toBe(400);
 });
 
 test("gateway client exposes analysis route helpers", async () => {
@@ -838,6 +873,8 @@ test("gateway client exposes analysis route helpers", async () => {
   await client.readiness("dungeons", "Notch", "Apple");
   await client.weight("Notch", "Apple");
   await client.plan("f7", "Notch", "Apple", 2000);
+  await client.museumPlan("Museum GIANTS_SWORD", "Notch", "Apple", 3000, 2, 500);
+  await client.museumPlan("Museum GIANTS_SWORD", "Notch", "Apple", 3000, 2, 500, true);
   await client.nextUpgrades(3000, "Notch", "Apple");
   await client.providerStatus();
   await client.llmProviderStatus();
@@ -872,6 +909,8 @@ test("gateway client exposes analysis route helpers", async () => {
   expect(paths).toContain("/agent/objectives");
   expect(paths).toContain("/agent/message");
   expect(paths).toContain("/resource?kind=items");
+  expect(paths).toContain("/museum/plan?goal=Museum+GIANTS_SWORD&player=Notch&profile=Apple&budget=3000&maxPriceLookups=2&timeoutMs=500");
+  expect(paths).toContain("/museum/plan");
 });
 
 test("started gateway serves client requests on localhost", async () => {

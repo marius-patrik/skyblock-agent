@@ -6,6 +6,7 @@ export * from "./hypixel.ts";
 export * from "./inventory.ts";
 export * from "./items.ts";
 export * from "./llm-provider.ts";
+export * from "./museum.ts";
 export * from "./nbt.ts";
 export * from "./networth.ts";
 export * from "./objectives.ts";

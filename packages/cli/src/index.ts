@@ -11,6 +11,7 @@ import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resource
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { llmProviderStatus, publicLlmProviderConfig, setLlmProviderConfigValue } from "@skyagent/core/llm-provider";
+import { museumDonationPlanForPlayer } from "@skyagent/core/museum";
 import { DEFAULT_NETWORTH_INCLUDE_ITEMS, DEFAULT_NETWORTH_MAX_ITEMS, DEFAULT_NETWORTH_TIMEOUT_MS, itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { completeObjectiveItem, createObjectiveItem, deleteObjectiveItem, listObjectiveItems, updateObjectiveItem } from "@skyagent/core/objectives";
 import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
@@ -87,6 +88,7 @@ Usage:
   skyagent weight [nameOrUuid] [profileIdOrName]
   skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]
   skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--use-context] [--persist-objectives] [--objective <id>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
+  skyagent museum-plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--max-price-lookups <n>] [--timeout-ms <ms>] [--persist-objectives]
   skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins> [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent item <internalId>
   skyagent price <itemId>
@@ -280,6 +282,21 @@ function optionalNumericOption(args, option) {
   return value === null ? undefined : Number(value);
 }
 
+function optionalBoundedNumericOption(args, option, fallback, { min = 0, integer = false } = {}) {
+  const value = optionValue(args, option);
+  if (value === null) {
+    return fallback;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min) {
+    throw new Error(`${option} must be a finite number greater than or equal to ${min}.`);
+  }
+  if (integer && !Number.isInteger(number)) {
+    throw new Error(`${option} must be an integer.`);
+  }
+  return number;
+}
+
 function parseNetworthBounds(args, defaultIncludeItems = DEFAULT_NETWORTH_INCLUDE_ITEMS) {
   return {
     maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
@@ -327,6 +344,49 @@ export function parsePlanArgs(args) {
     networthTimeoutMs: optionalNumericOption(args, "--networth-timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
     maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
     accessoryTimeoutMs: optionalNumericOption(args, "--accessory-timeout-ms") ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
+  };
+}
+
+export function parseMuseumPlanArgs(args) {
+  const budget = optionValue(args, "--budget");
+  const positionals = positionalArgs(args, ["--budget", "--max-price-lookups", "--timeout-ms", "--persist-objectives"]);
+  const goalParts = positionals.length ? [positionals[0]] : [];
+  const values = positionals.slice(1);
+  const first = String(positionals[0] ?? "");
+  const startsWithMuseumIntent = /^(museum|donate|donation|plan|buy|source|snipe)$/i.test(first);
+  const naturalGoalWord = /^[a-z][a-z0-9'’-]*$/i;
+  const internalItemId = /^[A-Z0-9]+(?:_[A-Z0-9]+)+$/;
+  const shouldExtendNaturalGoal = (token) => {
+    const value = String(token);
+    if (!naturalGoalWord.test(value)) {
+      return false;
+    }
+    const parsedGoalWords = startsWithMuseumIntent ? goalParts.slice(1) : goalParts;
+    if (parsedGoalWords.some((part) => internalItemId.test(String(part)))) {
+      return false;
+    }
+    if (/^[a-z]/.test(value)) {
+      return true;
+    }
+    return parsedGoalWords.length < 2;
+  };
+  if (startsWithMuseumIntent && values.length) {
+    goalParts.push(values.shift());
+    while (values.length && shouldExtendNaturalGoal(values[0])) {
+      goalParts.push(values.shift());
+    }
+  } else {
+    while (values.length && naturalGoalWord.test(first) && shouldExtendNaturalGoal(values[0])) {
+      goalParts.push(values.shift());
+    }
+  }
+  return {
+    goal: goalParts.length ? goalParts.join(" ") : null,
+    budget: budget === null ? null : Number(budget),
+    values,
+    maxPriceLookups: optionalBoundedNumericOption(args, "--max-price-lookups", 25, { min: 0, integer: true }),
+    timeoutMs: optionalBoundedNumericOption(args, "--timeout-ms", 8_000, { min: 1, integer: true }),
+    persistObjectives: args.includes("--persist-objectives"),
   };
 }
 
@@ -987,6 +1047,23 @@ export async function command(args) {
       networthTimeoutMs: parsed.networthTimeoutMs,
       maxPriceLookups: parsed.maxPriceLookups,
       accessoryTimeoutMs: parsed.accessoryTimeoutMs,
+    }));
+    return;
+  }
+
+  if (area === "museum-plan") {
+    const parsed = parseMuseumPlanArgs([action, ...rest].filter(Boolean));
+    if (!parsed.goal) {
+      throw new Error("Usage: skyagent museum-plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
+    }
+    if (parsed.budget !== null && (!Number.isFinite(parsed.budget) || parsed.budget < 0)) {
+      throw new Error("Usage: skyagent museum-plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
+    }
+    output(await museumDonationPlanForPlayer(parsed.goal, parsed.values[0], parsed.values[1], {
+      budget: parsed.budget,
+      maxPriceLookups: parsed.maxPriceLookups,
+      timeoutMs: parsed.timeoutMs,
+      persistObjectives: parsed.persistObjectives,
     }));
     return;
   }

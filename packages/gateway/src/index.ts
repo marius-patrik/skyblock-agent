@@ -14,6 +14,7 @@ import {
   itemNetworthForPlayer,
   llmProviderStatus,
   missingAccessoriesForPlayer,
+  museumDonationPlanForPlayer,
   networthForPlayer,
   nextUpgradesForPlayer,
   normalizedItemsForPlayer,
@@ -63,6 +64,7 @@ type GatewayDeps = {
   llmProviderStatus: typeof llmProviderStatus;
   accessoriesForPlayer: typeof accessoriesForPlayer;
   missingAccessoriesForPlayer: typeof missingAccessoriesForPlayer;
+  museumDonationPlanForPlayer: typeof museumDonationPlanForPlayer;
   accessoryUpgradesForPlayer: typeof accessoryUpgradesForPlayer;
   profileSectionForPlayer: typeof profileSectionForPlayer;
   progressionForPlayer: typeof progressionForPlayer;
@@ -120,6 +122,7 @@ const defaultDeps: GatewayDeps = {
   llmProviderStatus,
   accessoriesForPlayer,
   missingAccessoriesForPlayer,
+  museumDonationPlanForPlayer,
   accessoryUpgradesForPlayer,
   profileSectionForPlayer,
   progressionForPlayer,
@@ -454,6 +457,64 @@ export function createGateway(options: GatewayOptions = {}) {
         return json({ ok: true, plan: await deps.planGoalForPlayer(goal, player, profile, { budget }) });
       }
 
+      if (url.pathname === "/museum/plan" && request.method === "GET") {
+        const goal = query(url, "goal");
+        if (!goal) return errorResponse(400, "missing_goal", "Query parameter goal is required.");
+        if (query(url, "persistObjectives") !== undefined) {
+          return errorResponse(405, "persist_requires_post", "Use POST /museum/plan to persist Museum objectives.");
+        }
+        const budget = numberQuery(url, "budget");
+        if (budget !== null && (!Number.isFinite(budget) || budget < 0)) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
+        const maxPriceLookups = numberQuery(url, "maxPriceLookups");
+        const timeoutMs = numberQuery(url, "timeoutMs");
+        if (maxPriceLookups !== null && (!Number.isFinite(maxPriceLookups) || maxPriceLookups < 0)) {
+          return errorResponse(400, "invalid_max_price_lookups", "Query parameter maxPriceLookups must be a non-negative number.");
+        }
+        if (timeoutMs !== null && (!Number.isFinite(timeoutMs) || timeoutMs < 1)) {
+          return errorResponse(400, "invalid_timeout_ms", "Query parameter timeoutMs must be a positive number.");
+        }
+        if (maxPriceLookups !== null && !Number.isInteger(maxPriceLookups)) {
+          return errorResponse(400, "invalid_max_price_lookups", "Query parameter maxPriceLookups must be an integer.");
+        }
+        if (timeoutMs !== null && !Number.isInteger(timeoutMs)) {
+          return errorResponse(400, "invalid_timeout_ms", "Query parameter timeoutMs must be an integer.");
+        }
+        const [player, profile] = playerProfile(url);
+        return json({ ok: true, museumPlan: await deps.museumDonationPlanForPlayer(goal, player, profile, {
+          budget,
+          maxPriceLookups: maxPriceLookups ?? undefined,
+          timeoutMs: timeoutMs ?? undefined,
+          persistObjectives: false,
+        }) });
+      }
+
+      if (url.pathname === "/museum/plan" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const goal = body.goal ?? query(url, "goal");
+        if (!goal) return errorResponse(400, "missing_goal", "Field goal is required.");
+        const budget = body.budget ?? numberQuery(url, "budget");
+        if (budget !== null && budget !== undefined && (!Number.isFinite(Number(budget)) || Number(budget) < 0)) {
+          return errorResponse(400, "invalid_budget", "Field budget must be a non-negative number.");
+        }
+        const maxPriceLookups = body.maxPriceLookups ?? numberQuery(url, "maxPriceLookups");
+        const timeoutMs = body.timeoutMs ?? numberQuery(url, "timeoutMs");
+        if (maxPriceLookups !== null && maxPriceLookups !== undefined && (!Number.isFinite(Number(maxPriceLookups)) || Number(maxPriceLookups) < 0 || !Number.isInteger(Number(maxPriceLookups)))) {
+          return errorResponse(400, "invalid_max_price_lookups", "Field maxPriceLookups must be a non-negative integer.");
+        }
+        if (timeoutMs !== null && timeoutMs !== undefined && (!Number.isFinite(Number(timeoutMs)) || Number(timeoutMs) < 1 || !Number.isInteger(Number(timeoutMs)))) {
+          return errorResponse(400, "invalid_timeout_ms", "Field timeoutMs must be a positive integer.");
+        }
+        if (body.persistObjectives !== true) {
+          return errorResponse(400, "persist_required", "POST /museum/plan requires persistObjectives=true.");
+        }
+        return json({ ok: true, museumPlan: await deps.museumDonationPlanForPlayer(goal, body.player ?? query(url, "player"), body.profile ?? query(url, "profile"), {
+          budget: budget === null || budget === undefined ? null : Number(budget),
+          maxPriceLookups: maxPriceLookups === null || maxPriceLookups === undefined ? undefined : Number(maxPriceLookups),
+          timeoutMs: timeoutMs === null || timeoutMs === undefined ? undefined : Number(timeoutMs),
+          persistObjectives: true,
+        }) });
+      }
+
       if (url.pathname === "/next-upgrades" && request.method === "GET") {
         const budget = numberQuery(url, "budget");
         if (budget === null || !Number.isFinite(budget) || budget < 0) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
@@ -633,7 +694,7 @@ export function startGateway(options: StartGatewayOptions = {}) {
   };
 }
 
-function queryPath(route: string, values: Record<string, string | number | null | undefined>) {
+function queryPath(route: string, values: Record<string, string | number | boolean | null | undefined>) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
     if (value !== undefined && value !== null) {
@@ -775,6 +836,16 @@ export class GatewayClient {
 
   plan(goal: string, player?: string, profile?: string, budget?: number | null) {
     return this.request(queryPath("/plan", { goal, player, profile, budget }));
+  }
+
+  museumPlan(goal: string, player?: string, profile?: string, budget?: number | null, maxPriceLookups?: number | null, timeoutMs?: number | null, persistObjectives?: boolean | null) {
+    if (persistObjectives) {
+      return this.request("/museum/plan", {
+        method: "POST",
+        body: JSON.stringify({ goal, player, profile, budget, maxPriceLookups, timeoutMs, persistObjectives: true }),
+      });
+    }
+    return this.request(queryPath("/museum/plan", { goal, player, profile, budget, maxPriceLookups, timeoutMs }));
   }
 
   nextUpgrades(budget: number, player?: string, profile?: string) {

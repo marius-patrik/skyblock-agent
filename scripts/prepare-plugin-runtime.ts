@@ -35,6 +35,7 @@ const shims: PackageShim[] = [
       "./inventory": "src/inventory.ts",
       "./items": "src/items.ts",
       "./llm-provider": "src/llm-provider.ts",
+      "./museum": "src/museum.ts",
       "./nbt": "src/nbt.ts",
       "./networth": "src/networth.ts",
       "./objectives": "src/objectives.ts",

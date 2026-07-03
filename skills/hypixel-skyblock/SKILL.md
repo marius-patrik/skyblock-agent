@@ -60,7 +60,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 
 ## Common Goal Routing
 
-- Museum goals: bootstrap context and objectives, use `$skyagent-progression`/`skyblock_profile_section` for `museum`, fall back to `skyblock_museum` or `hypixel_request`, then inspect hidden gear/storage through `$skyagent-inventory-items` before pricing donation candidates.
+- Museum goals: bootstrap context and objectives, use `skyblock_museum_donation_plan` for owned, hidden-owned, missing, buy, source, and snipe donation candidates, then fall back to `$skyagent-progression`/`skyblock_profile_section` for `museum`, `skyblock_museum`, or bounded raw extraction only if the planner cannot cover the needed field.
 - Money routes: bootstrap context, check networth/capital, progression unlocks, relevant readiness, provider freshness, and price volatility before recommending routes.
 - Damage or Slayer goals: bootstrap context, check `skyblock_readiness` for `slayer`, inspect armor/equipment/current inventory/wardrobe/storage/museum signals, pets, accessories/Magical Power, budget, prices, and provider freshness before recommending purchases.
 - Accessories: route to `$skyagent-accessories` for Magical Power, missing accessories, duplicates, enrichment, recombobulation, and coin-per-MP upgrades.
@@ -93,6 +93,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyblock_weight` for labeled profile-weight estimates and explicit unsupported status for exact Senither/Lily formulas when maintained formula tables are unavailable.
 - Use `skyblock_readiness` for heuristic readiness estimates for `dungeons`, `slayer`, `kuudra`, `garden`, or `mining`; always carry forward its assumptions, freshness, and missing-data warnings.
 - Use `skyblock_plan_goal` when the user asks what to do next for a concrete goal; pass `useContext: true` for broad planning and preserve immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, skip guidance, source freshness, uncertainty, and warnings. Use `persistObjectives: true` only after the user explicitly wants the plan written to durable objectives.
+- Use `skyblock_museum_donation_plan` for Museum donation goals before generic progression planning. It should rank already-owned and hidden-owned candidates before buy recommendations, preserve section/source-path evidence, price missing candidates with bounded providers, and only persist objectives when explicitly requested.
 - Use `skyblock_next_upgrades` for budget-constrained upgrade ranking before suggesting purchases.
 - Use `skyblock_profile`, `skyblock_museum`, and `skyblock_garden` for profile-state analysis.
 - Use `skyblock_resource`, `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_firesales`, and `skyblock_news` for live game reference and economy context.

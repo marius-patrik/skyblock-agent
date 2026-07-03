@@ -22,7 +22,7 @@ Use this skill when the task depends on item stacks, inventory API state, decode
 - Use `$skyagent-live-progress` when recent inventory/profile refresh events may explain changed gear, pet swaps, purchases, or missing progress.
 - Use `$skyagent-objectives` when item findings should become source-item, buy-list, or snipe-target records.
 - For damage, Slayer, or money-route advice, inspect hidden context as well as current gear: wardrobe/loadout fallback, backpacks, ender chest, personal vault, pets, accessories, and museum-related item signals before judging readiness or recommending purchases.
-- For Museum goals, use normalized item records across storage sections to find likely donor candidates before suggesting buy/source targets.
+- For Museum goals, prefer `skyblock_museum_donation_plan` for donation candidate routing. Use normalized item records and storage section tools as follow-up evidence when the planner reports uncertain or missing item candidates.
 
 ## Rules
 

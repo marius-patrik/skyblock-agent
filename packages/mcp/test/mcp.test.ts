@@ -137,6 +137,13 @@ test("valuation-heavy MCP tools expose bounded agent controls", () => {
     maxPriceLookups: { type: "number" },
     accessoryTimeoutMs: { type: "number" },
   });
+  expect(schemaFor("skyblock_museum_donation_plan")).toMatchObject({
+    goal: { type: "string" },
+    budget: { type: "number" },
+    maxPriceLookups: { type: "number", minimum: 0 },
+    timeoutMs: { type: "number", minimum: 1 },
+    persistObjectives: { type: "boolean" },
+  });
   expect(schemaFor("skyblock_next_upgrades")).toMatchObject({
     maxPriceLookups: { type: "number" },
     accessoryTimeoutMs: { type: "number" },
@@ -147,6 +154,21 @@ test("planning MCP tool persists objectives only when explicitly requested", asy
   isolatedSkyAgentHome();
 
   await expect(callTool("skyblock_plan_goal", { goal: "f7", player: uuid, profile: "Apple" }))
+    .rejects.toThrow();
+  expect(await callTool("skyagent_objective_list", {})).toMatchObject({ count: 0 });
+});
+
+test("museum donation MCP tool is exposed and keeps persistence opt-in", async () => {
+  isolatedSkyAgentHome();
+
+  expect(tools.map((tool) => tool.name)).toContain("skyblock_museum_donation_plan");
+  await expect(callTool("skyblock_museum_donation_plan", { goal: "Museum GIANTS_SWORD", maxPriceLookups: Number.NaN }))
+    .rejects.toThrow("maxPriceLookups must be a finite number");
+  await expect(callTool("skyblock_museum_donation_plan", { goal: "Museum GIANTS_SWORD", maxPriceLookups: 1.5 }))
+    .rejects.toThrow("maxPriceLookups must be an integer");
+  await expect(callTool("skyblock_museum_donation_plan", { goal: "Museum GIANTS_SWORD", timeoutMs: Number.POSITIVE_INFINITY }))
+    .rejects.toThrow("timeoutMs must be a finite number");
+  await expect(callTool("skyblock_museum_donation_plan", { goal: "Museum GIANTS_SWORD", player: uuid, profile: "Apple" }))
     .rejects.toThrow();
   expect(await callTool("skyagent_objective_list", {})).toMatchObject({ count: 0 });
 });

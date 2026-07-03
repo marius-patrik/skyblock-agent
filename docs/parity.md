@@ -28,7 +28,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - SkyCrypt/SkyHelper-grade networth calculation, including modifier, pet-level, skin, dye, museum, and miscellaneous valuables.
 - SkyHelper-grade missing accessories when a full maintained accessory universe is unavailable.
 - Compact startup context that includes all hidden storage, sacks, Museum signals, profile availability flags, and coop/member provenance.
-- Museum donation planning that ranks already-owned, hidden-owned, missing, buy, source, and snipe candidates.
+- Full SkyCrypt/SkyHelper-grade Museum donation planning for every special case and maintained donatable item table. SkyAgent now has conservative owned/hidden/missing candidate routing, but unsupported eligibility/value cases remain warning-backed.
 - Full profile-viewer depth inside each progression section, including detailed SkyCrypt-grade UI breakdowns, per-floor dungeon badges, exact Garden milestone tables, full Museum item valuation, and richer Crimson Isle/Rift objective readiness.
 - Exact Senither/Lily weight parity and maintained reference-formula synchronization.
 - Gear-aware target readiness for specific Slayer bosses/tiers, Dungeon floors, Kuudra tiers, and damage goals.
@@ -61,7 +61,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 ## Next Implementation Layers
 
 1. Expand compact startup context with hidden storage, Museum, sacks, coop, and availability signals.
-2. Add Museum donation planning with hidden-owned candidate routing and bounded pricing.
+2. Deepen Museum donation planning with maintained donatable item metadata, XP/value tiers, and special-case eligibility.
 3. Upgrade readiness into target-aware gear, pet, accessory, modifier, and budget checks.
 4. Add route-specific planner modules for money, farming, Dungeon, Kuudra, buy, source, and snipe planning.
 5. Deepen provider metadata for pet levels, skins, dyes, Museum eligibility/value, accessory families, item modifiers, and price confidence.
